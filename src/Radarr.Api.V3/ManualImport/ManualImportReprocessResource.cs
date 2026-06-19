@@ -10,6 +10,7 @@ namespace Radarr.Api.V3.ManualImport
     public class ManualImportReprocessResource : RestResource
     {
         public string Path { get; set; }
+        public bool IsDirectory { get; set; }
         public int MovieId { get; set; }
         public MovieResource Movie { get; set; }
         public QualityModel Quality { get; set; }

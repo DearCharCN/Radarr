@@ -6,10 +6,13 @@ using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles.BlurayDisc;
+using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
@@ -24,7 +27,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
     {
         List<ManualImportItem> GetMediaFiles(int movieId);
         List<ManualImportItem> GetMediaFiles(string path, string downloadId, int? movieId, bool filterExistingFiles);
-        ManualImportItem ReprocessItem(string path, string downloadId, int movieId, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags);
+        ManualImportItem ReprocessItem(string path, string downloadId, int movieId, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags, bool isDirectory);
     }
 
     public class ManualImportService : IExecute<ManualImportCommand>, IManualImportService
@@ -40,6 +43,9 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
         private readonly IDownloadedMovieImportService _downloadedMovieImportService;
         private readonly IMediaFileService _mediaFileService;
         private readonly ICustomFormatCalculationService _formatCalculator;
+        private readonly IConfigService _configService;
+        private readonly IBlurayDiscDetector _blurayDiscDetector;
+        private readonly IVideoFileInfoReader _videoFileInfoReader;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
@@ -54,6 +60,9 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                                    IDownloadedMovieImportService downloadedMovieImportService,
                                    IMediaFileService mediaFileService,
                                    ICustomFormatCalculationService formatCalculator,
+                                   IConfigService configService,
+                                   IBlurayDiscDetector blurayDiscDetector,
+                                   IVideoFileInfoReader videoFileInfoReader,
                                    IEventAggregator eventAggregator,
                                    Logger logger)
         {
@@ -68,6 +77,9 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             _downloadedMovieImportService = downloadedMovieImportService;
             _mediaFileService = mediaFileService;
             _formatCalculator = formatCalculator;
+            _configService = configService;
+            _blurayDiscDetector = blurayDiscDetector;
+            _videoFileInfoReader = videoFileInfoReader;
             _eventAggregator = eventAggregator;
             _logger = logger;
         }
@@ -129,7 +141,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             return ProcessFolder(path, path, downloadId, movieId, filterExistingFiles);
         }
 
-        public ManualImportItem ReprocessItem(string path, string downloadId, int movieId, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags)
+        public ManualImportItem ReprocessItem(string path, string downloadId, int movieId, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags, bool isDirectory)
         {
             var rootFolder = Path.GetDirectoryName(path);
             var movie = _movieService.GetMovie(movieId);
@@ -152,34 +164,36 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                     ? languageParse
                     : languages;
 
-            var localMovie = new LocalMovie();
-            localMovie.Movie = movie;
-            localMovie.FileMovieInfo = Parser.Parser.ParseMoviePath(path);
-            localMovie.DownloadClientMovieInfo = downloadClientItem == null ? null : Parser.Parser.ParseMovieTitle(downloadClientItem.Title);
-            localMovie.DownloadItem = downloadClientItem;
-            localMovie.Path = path;
-            localMovie.SceneSource = SceneSource(movie, rootFolder);
-            localMovie.ExistingFile = movie.Path.IsParentPath(path);
-            localMovie.Size = _diskProvider.GetFileSize(path);
-            localMovie.ReleaseGroup = finalReleaseGroup;
-            localMovie.Languages = finalLanguages;
-            localMovie.Quality = finalQuality;
-            localMovie.IndexerFlags = (IndexerFlags)indexerFlags;
+            var localMovie = isDirectory
+                ? CreateBlurayLocalMovie(path, movie, downloadClientItem, finalReleaseGroup, finalQuality, finalLanguages, indexerFlags)
+                : new LocalMovie
+                {
+                    Movie = movie,
+                    FileMovieInfo = Parser.Parser.ParseMoviePath(path),
+                    DownloadClientMovieInfo = downloadClientItem == null ? null : Parser.Parser.ParseMovieTitle(downloadClientItem.Title),
+                    DownloadItem = downloadClientItem,
+                    Path = path,
+                    SceneSource = SceneSource(movie, rootFolder),
+                    ExistingFile = movie.Path.IsParentPath(path),
+                    Size = _diskProvider.GetFileSize(path),
+                    ReleaseGroup = finalReleaseGroup,
+                    Languages = finalLanguages,
+                    Quality = finalQuality,
+                    IndexerFlags = (IndexerFlags)indexerFlags
+                };
 
             localMovie.CustomFormats = _formatCalculator.ParseCustomFormat(localMovie);
             localMovie.CustomFormatScore = localMovie.Movie?.QualityProfile?.CalculateCustomFormatScore(localMovie.CustomFormats) ?? 0;
 
-            // Augment movie file so imported files have all additional information an automatic import would
             localMovie = _aggregationService.Augment(localMovie, downloadClientItem);
 
-            // Reapply the user-chosen values.
             localMovie.Movie = movie;
             localMovie.ReleaseGroup = finalReleaseGroup;
             localMovie.Quality = finalQuality;
             localMovie.Languages = finalLanguages;
             localMovie.IndexerFlags = (IndexerFlags)indexerFlags;
 
-            return MapItem(_importDecisionMaker.GetDecision(localMovie, downloadClientItem), rootFolder, downloadId, null);
+            return MapItem(GetManualImportDecision(localMovie, downloadClientItem), rootFolder, downloadId, null);
         }
 
         private List<ManualImportItem> ProcessFolder(string rootFolder, string baseFolder, string downloadId, int? movieId, bool filterExistingFiles)
@@ -216,6 +230,16 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 }
             }
 
+            if (movie == null && IsManualImportBlurayFolder(baseFolder))
+            {
+                var localMovie = CreateBlurayLocalMovie(baseFolder, null, downloadClientItem, string.Empty, new QualityModel(Quality.Unknown), new List<Language> { Language.Unknown }, 0);
+
+                return new List<ManualImportItem>
+                {
+                    MapItem(new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.UnknownMovie, "Unknown Movie")), rootFolder, downloadId, directoryInfo.Name)
+                };
+            }
+
             if (movie == null)
             {
                 // Filter paths based on the rootFolder, so files in subfolders that should be ignored are ignored.
@@ -239,11 +263,89 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 return processedFiles.Concat(processedFolders).Where(i => i != null).ToList();
             }
 
+            if (IsManualImportBlurayFolder(baseFolder))
+            {
+                return ProcessBlurayFolder(rootFolder, baseFolder, downloadId, movie, downloadClientItem, directoryInfo.Name);
+            }
+
             var folderInfo = Parser.Parser.ParseMovieTitle(directoryInfo.Name);
             var movieFiles = _diskScanService.FilterPaths(rootFolder, _diskScanService.GetVideoFiles(baseFolder).ToList());
             var decisions = _importDecisionMaker.GetImportDecisions(movieFiles, movie, downloadClientItem, folderInfo, SceneSource(movie, baseFolder), filterExistingFiles);
 
             return decisions.Select(decision => MapItem(decision, rootFolder, downloadId, directoryInfo.Name)).ToList();
+        }
+
+        private List<ManualImportItem> ProcessBlurayFolder(string rootFolder, string baseFolder, string downloadId, Movie movie, DownloadClientItem downloadClientItem, string folderName)
+        {
+            var mainStreamFile = _blurayDiscDetector.GetMainPlaylistFile(baseFolder);
+            var folderInfo = Parser.Parser.ParseMovieTitle(folderName);
+            var totalSize = GetFolderSize(baseFolder);
+
+            if (mainStreamFile == null)
+            {
+                var localMovie = CreateBlurayLocalMovie(baseFolder, movie, downloadClientItem, string.Empty, new QualityModel(Quality.Unknown), new List<Language> { Language.Unknown }, 0);
+
+                return new List<ManualImportItem>
+                {
+                    MapItem(new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.Error, "Unable to find main stream file in Blu-ray disc folder")), rootFolder, downloadId, folderName)
+                };
+            }
+
+            var decisions = _importDecisionMaker.GetImportDecisionsBluray(baseFolder, mainStreamFile, totalSize, movie, downloadClientItem, folderInfo);
+
+            return decisions.Select(decision => MapItem(decision, rootFolder, downloadId, folderName)).ToList();
+        }
+
+        private bool IsManualImportBlurayFolder(string path)
+        {
+            return _configService.ImportBlurayFolders && _blurayDiscDetector.IsBlurayDiscFolder(path);
+        }
+
+        private long GetFolderSize(string path)
+        {
+            return _diskProvider.GetFiles(path, true).Sum(f => _diskProvider.GetFileSize(f));
+        }
+
+        private LocalMovie CreateBlurayLocalMovie(string path, Movie movie, DownloadClientItem downloadClientItem, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags)
+        {
+            var mainStreamFile = _blurayDiscDetector.GetMainPlaylistFile(path);
+            var folderName = new DirectoryInfo(path).Name;
+            var localMovie = new LocalMovie
+            {
+                Movie = movie,
+                DownloadClientMovieInfo = downloadClientItem == null ? null : Parser.Parser.ParseMovieTitle(downloadClientItem.Title),
+                DownloadItem = downloadClientItem,
+                FolderMovieInfo = Parser.Parser.ParseMovieTitle(folderName),
+                FileMovieInfo = Parser.Parser.ParseMovieTitle(folderName),
+                Path = path,
+                Size = GetFolderSize(path),
+                IsDirectory = true,
+                BlurayMainStreamFile = mainStreamFile,
+                ExistingFile = movie != null && movie.Path.IsParentPath(path),
+                SceneSource = movie == null || !movie.Path.IsParentPath(path),
+                OtherVideoFiles = false,
+                ReleaseGroup = releaseGroup,
+                Quality = quality,
+                Languages = languages,
+                IndexerFlags = (IndexerFlags)indexerFlags
+            };
+
+            if (mainStreamFile != null)
+            {
+                localMovie.MediaInfo = _videoFileInfoReader.GetMediaInfo(mainStreamFile);
+            }
+
+            return localMovie;
+        }
+
+        private ImportDecision GetManualImportDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem)
+        {
+            if (localMovie.IsDirectory && localMovie.BlurayMainStreamFile == null)
+            {
+                return new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.Error, "Unable to find main stream file in Blu-ray disc folder"));
+            }
+
+            return _importDecisionMaker.GetDecision(localMovie, downloadClientItem);
         }
 
         private ManualImportItem ProcessFile(string rootFolder, string baseFolder, string file, string downloadId, Movie movie = null)
@@ -359,12 +461,13 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 
             item.Path = decision.LocalMovie.Path;
             item.FolderName = folderName;
-            item.RelativePath = rootFolder.GetRelativePath(decision.LocalMovie.Path);
-            item.Name = Path.GetFileNameWithoutExtension(decision.LocalMovie.Path);
+            item.RelativePath = rootFolder.PathEquals(decision.LocalMovie.Path) ? new DirectoryInfo(decision.LocalMovie.Path).Name : rootFolder.GetRelativePath(decision.LocalMovie.Path);
+            item.Name = decision.LocalMovie.IsDirectory ? new DirectoryInfo(decision.LocalMovie.Path).Name : Path.GetFileNameWithoutExtension(decision.LocalMovie.Path);
             item.DownloadId = downloadId;
+            item.IsDirectory = decision.LocalMovie.IsDirectory;
 
             item.Quality = decision.LocalMovie.Quality;
-            item.Size = _diskProvider.GetFileSize(decision.LocalMovie.Path);
+            item.Size = decision.LocalMovie.IsDirectory ? decision.LocalMovie.Size : _diskProvider.GetFileSize(decision.LocalMovie.Path);
             item.Languages = decision.LocalMovie.Languages;
             item.ReleaseGroup = decision.LocalMovie.ReleaseGroup;
             item.Rejections = decision.Rejections;
@@ -388,13 +491,14 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             item.Path = Path.Combine(movie.Path, movieFile.RelativePath);
             item.FolderName = folderName;
             item.RelativePath = movieFile.RelativePath;
-            item.Name = Path.GetFileNameWithoutExtension(movieFile.Path);
+            item.Name = movieFile.IsDirectory ? new DirectoryInfo(item.Path).Name : Path.GetFileNameWithoutExtension(movieFile.Path);
+            item.IsDirectory = movieFile.IsDirectory;
             item.Movie = movie;
             item.ReleaseGroup = movieFile.ReleaseGroup;
             item.Quality = movieFile.Quality;
             item.Languages = movieFile.Languages;
             item.IndexerFlags = (int)movieFile.IndexerFlags;
-            item.Size = _diskProvider.GetFileSize(item.Path);
+            item.Size = movieFile.IsDirectory ? movieFile.Size : _diskProvider.GetFileSize(item.Path);
             item.Rejections = Enumerable.Empty<ImportRejection>();
             item.MovieFileId = movieFile.Id;
             item.CustomFormats = _formatCalculator.ParseCustomFormat(movieFile, movie);
@@ -415,29 +519,30 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 
                 var file = message.Files[i];
                 var movie = _movieService.GetMovie(file.MovieId);
-                var fileMovieInfo = Parser.Parser.ParseMoviePath(file.Path) ?? new ParsedMovieInfo();
                 var existingFile = movie.Path.IsParentPath(file.Path);
                 TrackedDownload trackedDownload = null;
-
-                var localMovie = new LocalMovie
-                {
-                    ExistingFile = existingFile,
-                    FileMovieInfo = fileMovieInfo,
-                    Path = file.Path,
-                    ReleaseGroup = file.ReleaseGroup,
-                    Quality = file.Quality,
-                    Languages = file.Languages,
-                    IndexerFlags = (IndexerFlags)file.IndexerFlags,
-                    Movie = movie,
-                    Size = 0
-                };
 
                 if (file.DownloadId.IsNotNullOrWhiteSpace())
                 {
                     trackedDownload = _trackedDownloadService.Find(file.DownloadId);
-                    localMovie.DownloadClientMovieInfo = trackedDownload?.RemoteMovie?.ParsedMovieInfo;
-                    localMovie.DownloadItem = trackedDownload?.DownloadItem;
                 }
+
+                var localMovie = file.IsDirectory
+                    ? CreateBlurayLocalMovie(file.Path, movie, trackedDownload?.DownloadItem, file.ReleaseGroup, file.Quality, file.Languages, file.IndexerFlags)
+                    : new LocalMovie
+                    {
+                        ExistingFile = existingFile,
+                        FileMovieInfo = Parser.Parser.ParseMoviePath(file.Path) ?? new ParsedMovieInfo(),
+                        DownloadClientMovieInfo = trackedDownload?.RemoteMovie?.ParsedMovieInfo,
+                        DownloadItem = trackedDownload?.DownloadItem,
+                        Path = file.Path,
+                        ReleaseGroup = file.ReleaseGroup,
+                        Quality = file.Quality,
+                        Languages = file.Languages,
+                        IndexerFlags = (IndexerFlags)file.IndexerFlags,
+                        Movie = movie,
+                        Size = 0
+                    };
 
                 if (file.FolderName.IsNotNullOrWhiteSpace())
                 {
@@ -445,10 +550,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                     localMovie.SceneSource = !existingFile;
                 }
 
-                // Augment movie file so imported files have all additional information an automatic import would
                 localMovie = _aggregationService.Augment(localMovie, trackedDownload?.DownloadItem);
 
-                // Apply the user-chosen values.
                 localMovie.Movie = movie;
                 localMovie.ReleaseGroup = file.ReleaseGroup;
                 localMovie.Quality = file.Quality;
@@ -458,8 +561,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 localMovie.CustomFormats = _formatCalculator.ParseCustomFormat(localMovie);
                 localMovie.CustomFormatScore = localMovie.Movie.QualityProfile?.CalculateCustomFormatScore(localMovie.CustomFormats) ?? 0;
 
-                // TODO: Cleanup non-tracked downloads
-                var importDecision = new ImportDecision(localMovie);
+                var importDecision = GetManualImportDecision(localMovie, trackedDownload?.DownloadItem);
 
                 if (trackedDownload == null)
                 {

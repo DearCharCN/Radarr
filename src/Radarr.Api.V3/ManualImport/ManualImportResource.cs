@@ -19,6 +19,7 @@ namespace Radarr.Api.V3.ManualImport
         public string FolderName { get; set; }
         public string Name { get; set; }
         public long Size { get; set; }
+        public bool IsDirectory { get; set; }
         public MovieResource Movie { get; set; }
         public int? MovieFileId { get; set; }
         public string ReleaseGroup { get; set; }
@@ -52,6 +53,7 @@ namespace Radarr.Api.V3.ManualImport
                 FolderName = model.FolderName,
                 Name = model.Name,
                 Size = model.Size,
+                IsDirectory = model.IsDirectory,
                 Movie = model.Movie.ToResource(0),
                 MovieFileId = model.MovieFileId,
                 ReleaseGroup = model.ReleaseGroup,

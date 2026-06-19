@@ -493,6 +493,7 @@ function InteractiveImportModalContent(
           path: item.path,
           folderName: item.folderName,
           movieId: movie.id,
+          isDirectory: item.isDirectory,
           releaseGroup,
           quality,
           languages,

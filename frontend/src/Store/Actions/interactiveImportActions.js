@@ -164,6 +164,7 @@ export const actionHandlers = handleThunks({
       return {
         id,
         path: item.path,
+        isDirectory: item.isDirectory,
         movieId: item.movie ? item.movie.id : undefined,
         quality: item.quality,
         languages: item.languages,

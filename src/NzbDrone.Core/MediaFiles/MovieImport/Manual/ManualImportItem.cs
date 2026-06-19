@@ -13,6 +13,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
         public string FolderName { get; set; }
         public string Name { get; set; }
         public long Size { get; set; }
+        public bool IsDirectory { get; set; }
         public Movie Movie { get; set; }
         public int? MovieFileId { get; set; }
         public QualityModel Quality { get; set; }
