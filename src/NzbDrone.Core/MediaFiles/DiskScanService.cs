@@ -9,7 +9,6 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Configuration;
-using NzbDrone.Core.MediaFiles.BlurayDisc;
 using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.MediaFiles.MediaInfo;

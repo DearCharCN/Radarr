@@ -59,7 +59,9 @@ namespace NzbDrone.Core.MediaFiles.BlurayDisc
                 var mainPlaylist = playlists.OrderByDescending(p => p.TotalSize).First();
 
                 _logger.Debug("Selected main playlist: {0} with {1} clips, total size: {2} bytes",
-                    mainPlaylist.FilePath, mainPlaylist.StreamFiles.Count, mainPlaylist.TotalSize);
+                    mainPlaylist.FilePath,
+                    mainPlaylist.StreamFiles.Count,
+                    mainPlaylist.TotalSize);
 
                 // Return the largest stream file in the main playlist
                 return mainPlaylist.StreamFiles
