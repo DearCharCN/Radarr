@@ -331,6 +331,18 @@ function MediaManagement() {
                     />
                   </FormGroup>
                 ) : null}
+
+                <FormGroup size={sizes.MEDIUM}>
+                  <FormLabel>{translate('ImportBlurayFolders')}</FormLabel>
+
+                  <FormInputGroup
+                    type={inputTypes.CHECK}
+                    name="importBlurayFolders"
+                    helpText={translate('ImportBlurayFoldersHelpText')}
+                    onChange={handleInputChange}
+                    {...settings.importBlurayFolders}
+                  />
+                </FormGroup>
               </FieldSet>
             ) : null}
 

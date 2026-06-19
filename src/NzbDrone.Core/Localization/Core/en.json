@@ -782,6 +782,8 @@
   "ImportCustomFormat": "Import Custom Format",
   "ImportErrors": "Import Errors",
   "ImportExistingMovies": "Import Existing Movies",
+  "ImportBlurayFolders": "Import Blu-ray Disc Folders",
+  "ImportBlurayFoldersHelpText": "Import entire Blu-ray disc directories (containing BDMV structure) as a single movie entry instead of individual files",
   "ImportExtraFiles": "Import Extra Files",
   "ImportExtraFilesMovieHelpText": "Import matching extra files (subtitles, nfo, etc) after importing a movie file",
   "ImportFailed": "Import failed: {sourceTitle}",

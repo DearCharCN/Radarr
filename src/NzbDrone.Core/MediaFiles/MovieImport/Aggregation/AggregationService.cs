@@ -40,6 +40,28 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Aggregation
 
         public LocalMovie Augment(LocalMovie localMovie, DownloadClientItem downloadClientItem)
         {
+            // For Blu-ray directory imports, Size and MediaInfo are already set by the caller
+            if (localMovie.IsDirectory)
+            {
+                localMovie.SceneName = localMovie.SceneSource ? SceneNameCalculator.GetSceneName(localMovie) : null;
+
+                foreach (var augmenter in _augmenters)
+                {
+                    try
+                    {
+                        augmenter.Aggregate(localMovie, downloadClientItem);
+                    }
+                    catch (Exception ex)
+                    {
+                        var message = $"Unable to augment information for Blu-ray folder: '{localMovie.Path}'. Movie: {localMovie.Movie} Error: {ex.Message}";
+
+                        _logger.Warn(ex, message);
+                    }
+                }
+
+                return localMovie;
+            }
+
             var isMediaFile = MediaFileExtensions.Extensions.Contains(Path.GetExtension(localMovie.Path));
 
             if (localMovie.DownloadClientMovieInfo == null &&

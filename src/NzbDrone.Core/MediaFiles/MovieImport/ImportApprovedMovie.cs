@@ -89,7 +89,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                     movieFile.DateAdded = DateTime.UtcNow;
                     movieFile.MovieId = localMovie.Movie.Id;
                     movieFile.Path = localMovie.Path.CleanFilePath();
-                    movieFile.Size = _diskProvider.GetFileSize(localMovie.Path);
+                    movieFile.Size = localMovie.IsDirectory ? localMovie.Size : _diskProvider.GetFileSize(localMovie.Path);
+                    movieFile.IsDirectory = localMovie.IsDirectory;
                     movieFile.Quality = localMovie.Quality;
                     movieFile.Languages = localMovie.Languages;
                     movieFile.MediaInfo = localMovie.MediaInfo;

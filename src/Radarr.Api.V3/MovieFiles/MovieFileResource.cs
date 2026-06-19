@@ -30,6 +30,7 @@ namespace Radarr.Api.V3.MovieFiles
 
         public string OriginalFilePath { get; set; }
         public bool QualityCutoffNotMet { get; set; }
+        public bool IsDirectory { get; set; }
     }
 
     public static class MovieFileResourceMapper
@@ -58,7 +59,8 @@ namespace Radarr.Api.V3.MovieFiles
                 ReleaseGroup = model.ReleaseGroup,
                 Edition = model.Edition,
                 MediaInfo = model.MediaInfo.ToResource(model.SceneName),
-                OriginalFilePath = model.OriginalFilePath
+                OriginalFilePath = model.OriginalFilePath,
+                IsDirectory = model.IsDirectory
             };
         }
 
@@ -86,7 +88,8 @@ namespace Radarr.Api.V3.MovieFiles
                 MediaInfo = model.MediaInfo.ToResource(model.SceneName),
                 QualityCutoffNotMet = upgradableSpecification?.QualityCutoffNotMet(movie.QualityProfile, model.Quality) ?? false,
                 OriginalFilePath = model.OriginalFilePath,
-                IndexerFlags = (int)model.IndexerFlags
+                IndexerFlags = (int)model.IndexerFlags,
+                IsDirectory = model.IsDirectory
             };
 
             if (formatCalculationService != null)

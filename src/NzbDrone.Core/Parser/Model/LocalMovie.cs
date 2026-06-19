@@ -18,6 +18,8 @@ namespace NzbDrone.Core.Parser.Model
 
         public string Path { get; set; }
         public long Size { get; set; }
+        public bool IsDirectory { get; set; }
+        public string BlurayMainStreamFile { get; set; }
         public ParsedMovieInfo FileMovieInfo { get; set; }
         public ParsedMovieInfo DownloadClientMovieInfo { get; set; }
         public DownloadClientItem DownloadItem { get; set; }

@@ -345,6 +345,8 @@
     "ImportFailed": "导入失败:{sourceTitle}",
     "ImportExtraFilesMovieHelpText": "导入电影后导入匹配的额外文件（字幕、nfo等）",
     "ImportExtraFiles": "导入额外文件",
+    "ImportBlurayFolders": "导入蓝光原盘目录",
+    "ImportBlurayFoldersHelpText": "将包含BDMV结构的蓝光原盘目录作为整体入库，而非单独导入视频文件",
     "ImportExistingMovies": "导入已有电影",
     "ImportErrors": "导入错误",
     "ImportedTo": "导入到",

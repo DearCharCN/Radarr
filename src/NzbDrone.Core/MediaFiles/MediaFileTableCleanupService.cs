@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using NLog;
 using NzbDrone.Common;
+using NzbDrone.Common.Disk;
 using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.MediaFiles
@@ -16,14 +17,17 @@ namespace NzbDrone.Core.MediaFiles
     {
         private readonly IMediaFileService _mediaFileService;
         private readonly IMovieService _movieService;
+        private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
 
         public MediaFileTableCleanupService(IMediaFileService mediaFileService,
                                             IMovieService movieService,
+                                            IDiskProvider diskProvider,
                                             Logger logger)
         {
             _mediaFileService = mediaFileService;
             _movieService = movieService;
+            _diskProvider = diskProvider;
             _logger = logger;
         }
 
@@ -39,6 +43,17 @@ namespace NzbDrone.Core.MediaFiles
 
                 try
                 {
+                    if (movieFile.IsDirectory)
+                    {
+                        if (!_diskProvider.FolderExists(movieFilePath))
+                        {
+                            _logger.Debug("Folder [{0}] no longer exists on disk, removing from db", movieFilePath);
+                            _mediaFileService.Delete(movieFile, DeleteMediaFileReason.MissingFromDisk);
+                        }
+
+                        continue;
+                    }
+
                     if (!filesOnDiskKeys.Contains(movieFilePath))
                     {
                         _logger.Debug("File [{0}] no longer exists on disk, removing from db", movieFilePath);

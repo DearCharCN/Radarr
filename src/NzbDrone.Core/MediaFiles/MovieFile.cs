@@ -16,6 +16,7 @@ namespace NzbDrone.Core.MediaFiles
         public string RelativePath { get; set; }
         public string Path { get; set; }
         public long Size { get; set; }
+        public bool IsDirectory { get; set; }
         public DateTime DateAdded { get; set; }
         public string OriginalFilePath { get; set; }
         public string SceneName { get; set; }

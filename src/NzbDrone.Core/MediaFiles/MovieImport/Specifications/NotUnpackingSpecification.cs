@@ -24,6 +24,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
 
         public ImportSpecDecision IsSatisfiedBy(LocalMovie localMovie, DownloadClientItem downloadClientItem)
         {
+            if (localMovie.IsDirectory)
+            {
+                _logger.Debug("{0} is a Blu-ray directory, skipping unpacking check", localMovie.Path);
+                return ImportSpecDecision.Accept();
+            }
+
             if (localMovie.ExistingFile)
             {
                 _logger.Debug("{0} is in movie folder, skipping unpacking check", localMovie.Path);

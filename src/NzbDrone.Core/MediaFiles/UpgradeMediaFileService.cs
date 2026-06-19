@@ -55,7 +55,19 @@ namespace NzbDrone.Core.MediaFiles
                 var subfolder = rootFolder.GetRelativePath(_diskProvider.GetParentFolder(movieFilePath));
                 string recycleBinPath = null;
 
-                if (_diskProvider.FileExists(movieFilePath))
+                if (existingFile.IsDirectory)
+                {
+                    if (_diskProvider.FolderExists(movieFilePath))
+                    {
+                        _logger.Debug("Removing existing movie folder: {0}", existingFile);
+                        _recycleBinProvider.DeleteFolder(movieFilePath);
+                    }
+                    else
+                    {
+                        _logger.Warn("Existing movie folder missing from disk: {0}", movieFilePath);
+                    }
+                }
+                else if (_diskProvider.FileExists(movieFilePath))
                 {
                     _logger.Debug("Removing existing movie file: {0}", existingFile);
                     recycleBinPath = _recycleBinProvider.DeleteFile(movieFilePath, subfolder);
@@ -71,13 +83,27 @@ namespace NzbDrone.Core.MediaFiles
 
             localMovie.OldFiles = moveFileResult.OldFiles;
 
-            if (copyOnly)
+            if (localMovie.IsDirectory)
             {
-                moveFileResult.MovieFile = _movieFileMover.CopyMovieFile(movieFile, localMovie);
+                if (copyOnly)
+                {
+                    moveFileResult.MovieFile = _movieFileMover.CopyMovieFolder(movieFile, localMovie);
+                }
+                else
+                {
+                    moveFileResult.MovieFile = _movieFileMover.MoveMovieFolder(movieFile, localMovie);
+                }
             }
             else
             {
-                moveFileResult.MovieFile = _movieFileMover.MoveMovieFile(movieFile, localMovie);
+                if (copyOnly)
+                {
+                    moveFileResult.MovieFile = _movieFileMover.CopyMovieFile(movieFile, localMovie);
+                }
+                else
+                {
+                    moveFileResult.MovieFile = _movieFileMover.MoveMovieFile(movieFile, localMovie);
+                }
             }
 
             return moveFileResult;

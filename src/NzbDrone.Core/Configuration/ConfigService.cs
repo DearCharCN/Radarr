@@ -267,6 +267,13 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("EnableMediaInfo", value); }
         }
 
+        public bool ImportBlurayFolders
+        {
+            get { return GetValueBoolean("ImportBlurayFolders", false); }
+
+            set { SetValue("ImportBlurayFolders", value); }
+        }
+
         public bool UseScriptImport
         {
             get { return GetValueBoolean("UseScriptImport", false); }

@@ -9,6 +9,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.History;
+using NzbDrone.Core.MediaFiles.BlurayDisc;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
@@ -32,6 +33,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMakeImportDecision _importDecisionMaker;
         private readonly IImportApprovedMovie _importApprovedMovie;
         private readonly IDetectSample _detectSample;
+        private readonly IBlurayDiscDetector _blurayDiscDetector;
         private readonly IRuntimeInfo _runtimeInfo;
         private readonly IConfigService _config;
         private readonly IHistoryService _historyService;
@@ -44,6 +46,7 @@ namespace NzbDrone.Core.MediaFiles
                                                IMakeImportDecision importDecisionMaker,
                                                IImportApprovedMovie importApprovedMovie,
                                                IDetectSample detectSample,
+                                               IBlurayDiscDetector blurayDiscDetector,
                                                IRuntimeInfo runtimeInfo,
                                                IConfigService config,
                                                IHistoryService historyService,
@@ -56,6 +59,7 @@ namespace NzbDrone.Core.MediaFiles
             _importDecisionMaker = importDecisionMaker;
             _importApprovedMovie = importApprovedMovie;
             _detectSample = detectSample;
+            _blurayDiscDetector = blurayDiscDetector;
             _runtimeInfo = runtimeInfo;
             _config = config;
             _historyService = historyService;
@@ -189,6 +193,12 @@ namespace NzbDrone.Core.MediaFiles
                 };
             }
 
+            // Check if this is a Blu-ray disc folder and setting is enabled
+            if (_config.ImportBlurayFolders && _blurayDiscDetector.IsBlurayDiscFolder(directoryInfo.FullName))
+            {
+                return ProcessBlurayFolder(directoryInfo, importMode, movie, downloadClientItem);
+            }
+
             var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
             var historyItems = _historyService.FindByDownloadId(downloadClientItem?.DownloadId ?? "");
             var firstHistoryItem = historyItems?.OrderByDescending(h => h.Date).FirstOrDefault();
@@ -239,6 +249,44 @@ namespace NzbDrone.Core.MediaFiles
                 }
             }
             else if (importResults.Empty())
+            {
+                importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName));
+            }
+
+            return importResults;
+        }
+
+        private List<ImportResult> ProcessBlurayFolder(DirectoryInfo directoryInfo, ImportMode importMode, Movie movie, DownloadClientItem downloadClientItem)
+        {
+            _logger.Info("Processing Blu-ray disc folder: {0}", directoryInfo.FullName);
+
+            var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
+            var folderInfo = Parser.Parser.ParseMovieTitle(cleanedUpName);
+
+            if (folderInfo != null)
+            {
+                _logger.Debug("{0} folder quality: {1}", cleanedUpName, folderInfo.Quality);
+            }
+
+            var mainStreamFile = _blurayDiscDetector.GetMainPlaylistFile(directoryInfo.FullName);
+
+            if (mainStreamFile == null)
+            {
+                _logger.Warn("Unable to find main stream file in Blu-ray disc: {0}", directoryInfo.FullName);
+                return new List<ImportResult>
+                {
+                    RejectionResult(ImportRejectionReason.Error, "Unable to find main stream file in Blu-ray disc folder")
+                };
+            }
+
+            // Calculate total size of the Blu-ray folder
+            var totalSize = _diskProvider.GetFiles(directoryInfo.FullName, true)
+                .Sum(f => _diskProvider.GetFileSize(f));
+
+            var decisions = _importDecisionMaker.GetImportDecisionsBluray(directoryInfo.FullName, mainStreamFile, totalSize, movie, downloadClientItem, folderInfo);
+            var importResults = _importApprovedMovie.Import(decisions, true, downloadClientItem, importMode);
+
+            if (importResults.Empty())
             {
                 importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName));
             }

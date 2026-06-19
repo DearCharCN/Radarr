@@ -20,6 +20,8 @@ namespace NzbDrone.Core.MediaFiles
         MovieFile MoveMovieFile(MovieFile movieFile, Movie movie);
         MovieFile MoveMovieFile(MovieFile movieFile, LocalMovie localMovie);
         MovieFile CopyMovieFile(MovieFile movieFile, LocalMovie localMovie);
+        MovieFile MoveMovieFolder(MovieFile movieFile, LocalMovie localMovie);
+        MovieFile CopyMovieFolder(MovieFile movieFile, LocalMovie localMovie);
     }
 
     public class MovieFileMovingService : IMoveMovieFiles
@@ -99,6 +101,35 @@ namespace NzbDrone.Core.MediaFiles
             return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.Copy, localMovie);
         }
 
+        public MovieFile MoveMovieFolder(MovieFile movieFile, LocalMovie localMovie)
+        {
+            var folderName = new DirectoryInfo(localMovie.Path).Name;
+            var destinationPath = Path.Combine(localMovie.Movie.Path, folderName);
+
+            EnsureMovieFolder(movieFile, localMovie.Movie, Path.Combine(destinationPath, "placeholder"));
+
+            _logger.Debug("Moving Blu-ray folder: {0} to {1}", localMovie.Path, destinationPath);
+
+            return TransferFolder(movieFile, localMovie.Movie, localMovie.Path, destinationPath, TransferMode.Move, localMovie);
+        }
+
+        public MovieFile CopyMovieFolder(MovieFile movieFile, LocalMovie localMovie)
+        {
+            var folderName = new DirectoryInfo(localMovie.Path).Name;
+            var destinationPath = Path.Combine(localMovie.Movie.Path, folderName);
+
+            EnsureMovieFolder(movieFile, localMovie.Movie, Path.Combine(destinationPath, "placeholder"));
+
+            if (_configService.CopyUsingHardlinks)
+            {
+                _logger.Debug("Attempting to hardlink Blu-ray folder: {0} to {1}", localMovie.Path, destinationPath);
+                return TransferFolder(movieFile, localMovie.Movie, localMovie.Path, destinationPath, TransferMode.HardLinkOrCopy, localMovie);
+            }
+
+            _logger.Debug("Copying Blu-ray folder: {0} to {1}", localMovie.Path, destinationPath);
+            return TransferFolder(movieFile, localMovie.Movie, localMovie.Path, destinationPath, TransferMode.Copy, localMovie);
+        }
+
         private MovieFile TransferFile(MovieFile movieFile, Movie movie, string destinationFilePath, TransferMode mode, LocalMovie localMovie = null)
         {
             Ensure.That(movieFile, () => movieFile).IsNotNull();
@@ -155,6 +186,42 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             _mediaFileAttributeService.SetFilePermissions(destinationFilePath);
+
+            return movieFile;
+        }
+
+        private MovieFile TransferFolder(MovieFile movieFile, Movie movie, string sourcePath, string destinationPath, TransferMode mode, LocalMovie localMovie = null)
+        {
+            Ensure.That(movieFile, () => movieFile).IsNotNull();
+            Ensure.That(movie, () => movie).IsNotNull();
+
+            if (!_diskProvider.FolderExists(sourcePath))
+            {
+                throw new DirectoryNotFoundException("Blu-ray folder path does not exist: " + sourcePath);
+            }
+
+            if (sourcePath == destinationPath)
+            {
+                throw new SameFilenameException("Folder not moved, source and destination are the same", sourcePath);
+            }
+
+            movieFile.RelativePath = movie.Path.GetRelativePath(destinationPath);
+
+            if (localMovie is not null)
+            {
+                localMovie.FileNameBeforeRename = movieFile.RelativePath;
+            }
+
+            _diskTransferService.TransferFolder(sourcePath, destinationPath, mode);
+
+            try
+            {
+                _mediaFileAttributeService.SetFolderLastWriteTime(movie.Path, movieFile.DateAdded);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Unable to set last write time");
+            }
 
             return movieFile;
         }

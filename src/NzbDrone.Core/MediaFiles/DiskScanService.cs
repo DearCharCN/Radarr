@@ -9,6 +9,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.MediaFiles.BlurayDisc;
 using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.MediaFiles.MediaInfo;
@@ -149,6 +150,13 @@ namespace NzbDrone.Core.MediaFiles
             foreach (var file in movieFiles)
             {
                 var path = Path.Combine(movie.Path, file.RelativePath);
+
+                if (file.IsDirectory)
+                {
+                    // Skip size-change detection for Blu-ray directories during scan
+                    continue;
+                }
+
                 var fileSize = _diskProvider.GetFileSize(path);
 
                 if (file.Size == fileSize)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
@@ -7,6 +8,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
+using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
@@ -19,6 +21,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, bool filterExistingFiles);
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo, bool sceneSource);
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo, bool sceneSource, bool filterExistingFiles);
+        List<ImportDecision> GetImportDecisionsBluray(string blurayPath, string mainStreamFile, long totalSize, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo);
         ImportDecision GetDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem);
     }
 
@@ -31,6 +34,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         private readonly IDetectSample _detectSample;
         private readonly ITrackedDownloadService _trackedDownloadService;
         private readonly ICustomFormatCalculationService _formatCalculator;
+        private readonly IVideoFileInfoReader _videoFileInfoReader;
         private readonly Logger _logger;
 
         public ImportDecisionMaker(IEnumerable<IImportDecisionEngineSpecification> specifications,
@@ -40,6 +44,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                                    IDetectSample detectSample,
                                    ITrackedDownloadService trackedDownloadService,
                                    ICustomFormatCalculationService formatCalculator,
+                                   IVideoFileInfoReader videoFileInfoReader,
                                    Logger logger)
         {
             _specifications = specifications;
@@ -49,6 +54,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _detectSample = detectSample;
             _trackedDownloadService = trackedDownloadService;
             _formatCalculator = formatCalculator;
+            _videoFileInfoReader = videoFileInfoReader;
             _logger = logger;
         }
 
@@ -197,6 +203,109 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             }
 
             return null;
+        }
+
+        public List<ImportDecision> GetImportDecisionsBluray(string blurayPath, string mainStreamFile, long totalSize, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo)
+        {
+            _logger.Debug("Making import decision for Blu-ray folder: {0}", blurayPath);
+
+            var decisions = new List<ImportDecision>();
+
+            ParsedMovieInfo downloadClientItemInfo = null;
+
+            if (downloadClientItem != null)
+            {
+                downloadClientItemInfo = Parser.Parser.ParseMovieTitle(downloadClientItem.Title);
+            }
+
+            var localMovie = new LocalMovie
+            {
+                Movie = movie,
+                DownloadClientMovieInfo = downloadClientItemInfo,
+                DownloadItem = downloadClientItem,
+                FolderMovieInfo = folderInfo,
+                Path = blurayPath,
+                Size = totalSize,
+                IsDirectory = true,
+                BlurayMainStreamFile = mainStreamFile,
+                SceneSource = true,
+                ExistingFile = movie.Path.IsParentPath(blurayPath),
+                OtherVideoFiles = false
+            };
+
+            var decision = GetBlurayDecision(localMovie, downloadClientItem);
+            decisions.AddIfNotNull(decision);
+
+            return decisions;
+        }
+
+        private ImportDecision GetBlurayDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem)
+        {
+            ImportDecision decision = null;
+
+            try
+            {
+                // Parse quality/info from the folder name
+                var folderName = new DirectoryInfo(localMovie.Path).Name;
+                var fileMovieInfo = Parser.Parser.ParseMovieTitle(folderName);
+
+                localMovie.FileMovieInfo = fileMovieInfo;
+
+                // Get MediaInfo from the main m2ts stream file
+                if (localMovie.BlurayMainStreamFile != null)
+                {
+                    _logger.Debug("Getting MediaInfo from main stream: {0}", localMovie.BlurayMainStreamFile);
+                    localMovie.MediaInfo = _videoFileInfoReader.GetMediaInfo(localMovie.BlurayMainStreamFile);
+                }
+
+                _aggregationService.Augment(localMovie, downloadClientItem);
+
+                if (localMovie.Movie == null)
+                {
+                    decision = new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.InvalidMovie, "Invalid movie"));
+                }
+                else
+                {
+                    if (downloadClientItem?.DownloadId.IsNotNullOrWhiteSpace() == true)
+                    {
+                        var trackedDownload = _trackedDownloadService.Find(downloadClientItem.DownloadId);
+
+                        if (trackedDownload?.RemoteMovie?.Release?.IndexerFlags != null)
+                        {
+                            localMovie.IndexerFlags = trackedDownload.RemoteMovie.Release.IndexerFlags;
+                        }
+                    }
+
+                    localMovie.CustomFormats = _formatCalculator.ParseCustomFormat(localMovie);
+                    localMovie.CustomFormatScore = localMovie.Movie.QualityProfile?.CalculateCustomFormatScore(localMovie.CustomFormats) ?? 0;
+
+                    decision = GetDecision(localMovie, downloadClientItem);
+                }
+            }
+            catch (AugmentingFailedException)
+            {
+                decision = new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.UnableToParse, "Unable to parse Blu-ray folder"));
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Couldn't process Blu-ray folder: {0}", localMovie.Path);
+                decision = new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.Error, "Unexpected error processing Blu-ray folder"));
+            }
+
+            if (decision == null)
+            {
+                _logger.Error("Unable to make a decision on {0}", localMovie.Path);
+            }
+            else if (decision.Rejections.Any())
+            {
+                _logger.Debug("Blu-ray folder rejected for the following reasons: {0}", string.Join(", ", decision.Rejections));
+            }
+            else
+            {
+                _logger.Debug("Blu-ray folder accepted");
+            }
+
+            return decision;
         }
 
         private int GetNonSampleVideoFileCount(List<string> videoFiles, MovieMetadata movie)
