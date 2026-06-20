@@ -35,6 +35,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IRootFolderService _rootFolderService;
         private readonly IEventAggregator _eventAggregator;
         private readonly IConfigService _configService;
+        private readonly INamingConfigService _namingConfigService;
         private readonly Logger _logger;
 
         public MovieFileMovingService(IUpdateMovieFileService updateMovieFileService,
@@ -46,6 +47,7 @@ namespace NzbDrone.Core.MediaFiles
                                 IRootFolderService rootFolderService,
                                 IEventAggregator eventAggregator,
                                 IConfigService configService,
+                                INamingConfigService namingConfigService,
                                 Logger logger)
         {
             _updateMovieFileService = updateMovieFileService;
@@ -57,6 +59,7 @@ namespace NzbDrone.Core.MediaFiles
             _rootFolderService = rootFolderService;
             _eventAggregator = eventAggregator;
             _configService = configService;
+            _namingConfigService = namingConfigService;
             _logger = logger;
         }
 
@@ -103,8 +106,7 @@ namespace NzbDrone.Core.MediaFiles
 
         public MovieFile MoveMovieFolder(MovieFile movieFile, LocalMovie localMovie)
         {
-            var folderName = new DirectoryInfo(localMovie.Path).Name;
-            var destinationPath = Path.Combine(localMovie.Movie.Path, folderName);
+            var destinationPath = GetMovieFolderDestinationPath(movieFile, localMovie);
 
             EnsureMovieFolder(movieFile, localMovie.Movie, Path.Combine(destinationPath, "placeholder"));
 
@@ -115,8 +117,7 @@ namespace NzbDrone.Core.MediaFiles
 
         public MovieFile CopyMovieFolder(MovieFile movieFile, LocalMovie localMovie)
         {
-            var folderName = new DirectoryInfo(localMovie.Path).Name;
-            var destinationPath = Path.Combine(localMovie.Movie.Path, folderName);
+            var destinationPath = GetMovieFolderDestinationPath(movieFile, localMovie);
 
             EnsureMovieFolder(movieFile, localMovie.Movie, Path.Combine(destinationPath, "placeholder"));
 
@@ -128,6 +129,14 @@ namespace NzbDrone.Core.MediaFiles
 
             _logger.Debug("Copying Blu-ray folder: {0} to {1}", localMovie.Path, destinationPath);
             return TransferFolder(movieFile, localMovie.Movie, localMovie.Path, destinationPath, TransferMode.Copy, localMovie);
+        }
+
+        private string GetMovieFolderDestinationPath(MovieFile movieFile, LocalMovie localMovie)
+        {
+            var namingConfig = _namingConfigService.GetConfig();
+            var folderName = namingConfig.RenameMovies ? _buildFileNames.BuildFileName(localMovie.Movie, movieFile, namingConfig, localMovie.CustomFormats) : new DirectoryInfo(localMovie.Path).Name;
+
+            return Path.Combine(localMovie.Movie.Path, folderName);
         }
 
         private MovieFile TransferFile(MovieFile movieFile, Movie movie, string destinationFilePath, TransferMode mode, LocalMovie localMovie = null)
