@@ -152,6 +152,31 @@ namespace NzbDrone.Core.Indexers.Newznab
                 .ToList();
         }
 
+        protected override string GetMediaInfoStatus(XElement item)
+        {
+            return TryGetNewznabAttribute(item, "mediaInfoStatus");
+        }
+
+        protected override string GetMediaInfoSearchId(XElement item)
+        {
+            return TryGetNewznabAttribute(item, "mediaInfoSearchId");
+        }
+
+        protected override string GetMediaInfoProgressStatus(XElement item)
+        {
+            return TryGetNewznabAttribute(item, "mediaInfoProgressStatus");
+        }
+
+        protected override int GetMediaInfoProgressCompleted(XElement item)
+        {
+            return GetIntNewznabAttribute(item, "mediaInfoProgressCompleted");
+        }
+
+        protected override int GetMediaInfoProgressTotal(XElement item)
+        {
+            return GetIntNewznabAttribute(item, "mediaInfoProgressTotal");
+        }
+
         protected override long GetSize(XElement item)
         {
             var sizeString = TryGetNewznabAttribute(item, "size");
@@ -252,6 +277,18 @@ namespace NzbDrone.Core.Indexers.Newznab
             }
 
             return flags;
+        }
+
+        protected int GetIntNewznabAttribute(XElement item, string key, int defaultValue = 0)
+        {
+            var attr = TryGetNewznabAttribute(item, key, defaultValue.ToString());
+
+            if (int.TryParse(attr, out var result))
+            {
+                return result;
+            }
+
+            return defaultValue;
         }
 
         protected string TryGetNewznabAttribute(XElement item, string key, string defaultValue = "")

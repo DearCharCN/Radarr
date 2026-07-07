@@ -4,9 +4,11 @@ import { createSelector } from 'reselect';
 import ProtocolLabel from 'Activity/Queue/ProtocolLabel';
 import AppState from 'App/State/AppState';
 import Icon from 'Components/Icon';
+import Label from 'Components/Label';
 import Link from 'Components/Link/Link';
 import SpinnerIconButton from 'Components/Link/SpinnerIconButton';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
+import SpinnerIcon from 'Components/SpinnerIcon';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import Popover from 'Components/Tooltip/Popover';
@@ -82,20 +84,6 @@ function formatAudioInfo(audioInfo: ReleaseAudioInfo) {
   return language || specification || '';
 }
 
-function getMediaSummary(audioInfo: ReleaseAudioInfo[], subs: string[]) {
-  const parts: string[] = [];
-
-  if (audioInfo.length) {
-    parts.push(`${audioInfo.length} audio`);
-  }
-
-  if (subs.length) {
-    parts.push(`${subs.length} subs`);
-  }
-
-  return parts.join(' / ');
-}
-
 function releaseHistorySelector({ guid }: Release) {
   return createSelector(
     (state: AppState) => state.movieHistory.items,
@@ -154,6 +142,7 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
     languages,
     subs = [],
     audioInfo = [],
+    mediaInfoStatus,
     customFormatScore,
     customFormats,
     mappedMovieId,
@@ -177,7 +166,15 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
   const [isConfirmGrabModalOpen, setIsConfirmGrabModalOpen] = useState(false);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const audioDetails = audioInfo.map(formatAudioInfo).filter(Boolean);
-  const mediaSummary = getMediaSummary(audioInfo, subs);
+  const audioLabel =
+    audioDetails.length > 1
+      ? translate('MultiLanguage')
+      : audioInfo[0]?.language?.trim() || audioDetails[0];
+  const subtitleLabel =
+    subs.length > 1 ? translate('MultiLanguage') : subs[0];
+  const isMediaInfoPending = mediaInfoStatus === 'pending';
+  const isAudioInfoLoading = isMediaInfoPending && !audioDetails.length;
+  const isSubsLoading = isMediaInfoPending && !subs.length;
 
   const onGrabPressWrapper = useCallback(() => {
     if (downloadAllowed) {
@@ -309,39 +306,62 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
         <MovieLanguages languages={languages} />
       </TableRowCell>
 
-      <TableRowCell className={styles.media}>
-        {mediaSummary ? (
-          <Popover
-            anchor={<span className={styles.mediaText}>{mediaSummary}</span>}
-            title={translate('MediaInfo')}
-            body={
-              <div>
-                {audioDetails.length ? (
-                  <>
-                    <div>{translate('AudioInfo')}</div>
-                    <ul>
-                      {audioDetails.map((audio, index) => {
-                        return <li key={index}>{audio}</li>;
-                      })}
-                    </ul>
-                  </>
-                ) : null}
+      <TableRowCell className={styles.audioInfo}>
+        <span className={styles.mediaCellContent}>
+          {audioDetails.length ? (
+            <Popover
+              anchor={
+                <Label kind={kinds.INVERSE}>
+                  {audioLabel || translate('AudioInfo')}
+                </Label>
+              }
+              title={translate('AudioInfo')}
+              body={
+                <ul>
+                  {audioDetails.map((audio, index) => {
+                    return <li key={index}>{audio}</li>;
+                  })}
+                </ul>
+              }
+              position={tooltipPositions.LEFT}
+            />
+          ) : null}
 
-                {subs.length ? (
-                  <>
-                    <div>{translate('SubtitleLanguages')}</div>
-                    <ul>
-                      {subs.map((subtitle, index) => {
-                        return <li key={index}>{subtitle}</li>;
-                      })}
-                    </ul>
-                  </>
-                ) : null}
-              </div>
-            }
-            position={tooltipPositions.LEFT}
-          />
-        ) : null}
+          {isAudioInfoLoading ? (
+            <SpinnerIcon
+              className={styles.mediaLoadingIcon}
+              name={icons.SPINNER}
+              isSpinning={true}
+            />
+          ) : null}
+        </span>
+      </TableRowCell>
+
+      <TableRowCell className={styles.subs}>
+        <span className={styles.mediaCellContent}>
+          {subs.length ? (
+            <Popover
+              anchor={<Label kind={kinds.INVERSE}>{subtitleLabel}</Label>}
+              title={translate('SubtitleLanguages')}
+              body={
+                <ul>
+                  {subs.map((subtitle, index) => {
+                    return <li key={index}>{subtitle}</li>;
+                  })}
+                </ul>
+              }
+              position={tooltipPositions.LEFT}
+            />
+          ) : null}
+
+          {isSubsLoading ? (
+            <SpinnerIcon
+              className={styles.mediaLoadingIcon}
+              name={icons.SPINNER}
+              isSpinning={true}
+            />
+          ) : null}
+        </span>
       </TableRowCell>
 
       <TableRowCell className={styles.quality}>

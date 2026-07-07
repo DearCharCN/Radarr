@@ -4,9 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Common.Http;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Translations;
@@ -23,7 +26,10 @@ namespace NzbDrone.Core.IndexerSearch
 
     public class ReleaseSearchService : ISearchForReleases
     {
+        private static readonly TimeSpan MediaInfoWaitTimeout = TimeSpan.FromSeconds(120);
+
         private readonly IIndexerFactory _indexerFactory;
+        private readonly IHttpClient _httpClient;
         private readonly IMakeDownloadDecision _makeDownloadDecision;
         private readonly IMovieService _movieService;
         private readonly IMovieTranslationService _movieTranslationService;
@@ -31,6 +37,7 @@ namespace NzbDrone.Core.IndexerSearch
         private readonly Logger _logger;
 
         public ReleaseSearchService(IIndexerFactory indexerFactory,
+                                IHttpClient httpClient,
                                 IMakeDownloadDecision makeDownloadDecision,
                                 IMovieService movieService,
                                 IMovieTranslationService movieTranslationService,
@@ -38,6 +45,7 @@ namespace NzbDrone.Core.IndexerSearch
                                 Logger logger)
         {
             _indexerFactory = indexerFactory;
+            _httpClient = httpClient;
             _makeDownloadDecision = makeDownloadDecision;
             _movieService = movieService;
             _movieTranslationService = movieTranslationService;
@@ -106,11 +114,20 @@ namespace NzbDrone.Core.IndexerSearch
 
             _logger.ProgressInfo("Searching indexers for {0}. {1} active indexers", criteriaBase, indexers.Count);
 
-            var tasks = indexers.Select(indexer => DispatchIndexer(searchAction, indexer, criteriaBase));
+            async Task<List<ReleaseInfo>> FetchReports()
+            {
+                var tasks = indexers.Select(indexer => DispatchIndexer(searchAction, indexer, criteriaBase));
+                var batch = await Task.WhenAll(tasks);
 
-            var batch = await Task.WhenAll(tasks);
+                return batch.SelectMany(x => x).ToList();
+            }
 
-            var reports = batch.SelectMany(x => x).ToList();
+            var reports = await FetchReports();
+
+            if (!criteriaBase.InteractiveSearch)
+            {
+                reports = await WaitForMediaInfoCompletion(reports, FetchReports, criteriaBase);
+            }
 
             _logger.ProgressDebug("Total of {0} reports were found for {1} from {2} indexers", reports.Count, criteriaBase, indexers.Count);
 
@@ -139,6 +156,147 @@ namespace NzbDrone.Core.IndexerSearch
             }
 
             return Array.Empty<ReleaseInfo>();
+        }
+
+        private async Task<List<ReleaseInfo>> WaitForMediaInfoCompletion(List<ReleaseInfo> reports, Func<Task<List<ReleaseInfo>>> fetchReports, SearchCriteriaBase criteriaBase)
+        {
+            if (!HasPendingMediaInfo(reports))
+            {
+                return reports;
+            }
+
+            var started = DateTime.UtcNow;
+
+            _logger.ProgressInfo("Waiting for additional media data before processing automatic search results for {0}", criteriaBase);
+
+            while (HasPendingMediaInfo(reports) && DateTime.UtcNow - started < MediaInfoWaitTimeout)
+            {
+                var enrichedAny = EnrichPendingMediaInfo(reports);
+
+                if (!enrichedAny)
+                {
+                    reports = await fetchReports();
+                }
+            }
+
+            if (HasPendingMediaInfo(reports))
+            {
+                _logger.Warn("Timed out waiting for additional media data for {0}; continuing with the latest available search results", criteriaBase);
+            }
+
+            return reports;
+        }
+
+        private bool EnrichPendingMediaInfo(List<ReleaseInfo> reports)
+        {
+            var enrichedAny = false;
+
+            foreach (var report in reports.Where(x => x.MediaInfoStatus == "pending").ToList())
+            {
+                if (report.ProwlarrIndexerId <= 0)
+                {
+                    report.MediaInfoStatus = "unavailable";
+                    report.MediaInfoProgressStatus = null;
+                    continue;
+                }
+
+                var indexer = _indexerFactory.Get(report.IndexerId);
+                var settings = indexer?.Settings as NewznabSettings;
+
+                if (settings == null)
+                {
+                    report.MediaInfoStatus = "unavailable";
+                    report.MediaInfoProgressStatus = null;
+                    continue;
+                }
+
+                var request = new HttpRequestBuilder(BuildProwlarrMediaInfoUrl(settings))
+                    .Post()
+                    .Build();
+
+                request.Headers.ContentType = "application/json";
+                request.SetContent(new
+                {
+                    report.Guid,
+                    IndexerId = report.ProwlarrIndexerId,
+                    report.MediaInfoSearchId
+                }.ToJson());
+                request.ContentSummary = $"{{ \"guid\": \"{report.Guid}\", \"indexerId\": {report.ProwlarrIndexerId}, \"mediaInfoSearchId\": \"{report.MediaInfoSearchId}\" }}";
+                request.SuppressHttpError = true;
+
+                if (settings.ApiKey.IsNotNullOrWhiteSpace())
+                {
+                    request.Headers.Set("X-Api-Key", settings.ApiKey);
+                }
+
+                var response = _httpClient.Post<ReleaseMediaInfoResult>(request);
+
+                if (response.HasHttpError || response.Resource == null)
+                {
+                    _logger.Debug("Prowlarr mediaInfo request failed for automatic-search release '{0}' from indexer {1}", report.Guid, report.IndexerId);
+                    report.MediaInfoStatus = "failed";
+                    report.MediaInfoProgressStatus = null;
+                    continue;
+                }
+
+                report.Subs = response.Resource.Subs ?? report.Subs;
+                report.AudioInfo = response.Resource.AudioInfo ?? report.AudioInfo;
+                report.MediaInfoStatus = response.Resource.MediaInfoStatus;
+                report.MediaInfoSearchId = response.Resource.MediaInfoSearchId;
+                report.MediaInfoProgressStatus = response.Resource.MediaInfoProgressStatus;
+                report.MediaInfoProgressCompleted = response.Resource.MediaInfoProgressCompleted;
+                report.MediaInfoProgressTotal = response.Resource.MediaInfoProgressTotal;
+                enrichedAny = true;
+            }
+
+            return enrichedAny;
+        }
+
+        private static bool HasPendingMediaInfo(List<ReleaseInfo> reports)
+        {
+            return reports.Any(report => report.MediaInfoStatus == "pending" || report.MediaInfoProgressStatus == "pending");
+        }
+
+        private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings)
+        {
+            var baseUrl = settings.BaseUrl.TrimEnd('/');
+            var apiPath = settings.ApiPath.IsNullOrWhiteSpace() ? "/api" : settings.ApiPath;
+            var combinedUrl = $"{baseUrl}/{apiPath.TrimStart('/')}";
+            var uriBuilder = new UriBuilder(combinedUrl);
+            var segments = uriBuilder.Path
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+
+            if (segments.Count > 0 && segments.Last().Equals("api", StringComparison.OrdinalIgnoreCase))
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+
+            if (segments.Count > 0 && int.TryParse(segments.Last(), out _))
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+
+            segments.Add("api");
+            segments.Add("v1");
+            segments.Add("search");
+            segments.Add("mediaInfo");
+
+            uriBuilder.Path = string.Join("/", segments);
+            uriBuilder.Query = string.Empty;
+
+            return uriBuilder.Uri.AbsoluteUri;
+        }
+
+        private class ReleaseMediaInfoResult
+        {
+            public List<string> Subs { get; set; }
+            public List<ReleaseAudioInfo> AudioInfo { get; set; }
+            public string MediaInfoStatus { get; set; }
+            public string MediaInfoSearchId { get; set; }
+            public string MediaInfoProgressStatus { get; set; }
+            public int MediaInfoProgressCompleted { get; set; }
+            public int MediaInfoProgressTotal { get; set; }
         }
 
         private List<DownloadDecision> DeDupeDecisions(List<DownloadDecision> decisions)

@@ -1,13 +1,15 @@
 import { createAction } from 'redux-actions';
+import { batchActions } from 'redux-batched-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, filterTypePredicates, filterTypes, sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
 import sortByProp from 'Utilities/Array/sortByProp';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
+import getSectionState from 'Utilities/State/getSectionState';
+import updateSectionState from 'Utilities/State/updateSectionState';
 import translate from 'Utilities/String/translate';
-import createFetchHandler from './Creators/createFetchHandler';
+import { set, update } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
 import createSetClientSideCollectionFilterReducer from './Creators/Reducers/createSetClientSideCollectionFilterReducer';
-import createSetClientSideCollectionSortReducer from './Creators/Reducers/createSetClientSideCollectionSortReducer';
 
 //
 // Variables
@@ -15,6 +17,11 @@ import createSetClientSideCollectionSortReducer from './Creators/Reducers/create
 export const section = 'releases';
 
 let abortCurrentRequest = null;
+let mediaInfoAbortRequests = [];
+let mediaInfoSearchId = 0;
+
+const mediaInfoConcurrency = 4;
+const mediaInfoSortKeys = ['audioInfo', 'subs'];
 
 //
 // State
@@ -22,6 +29,10 @@ let abortCurrentRequest = null;
 export const defaultState = {
   isFetching: false,
   isPopulated: false,
+  isMediaInfoFetching: false,
+  isMediaInfoComplete: false,
+  mediaInfoTotal: 0,
+  mediaInfoCompleted: 0,
   error: null,
   items: [],
   sortKey: 'releaseWeight',
@@ -44,6 +55,14 @@ export const defaultState = {
       }
 
       return item.languages[0]?.id ?? 0;
+    },
+
+    audioInfo: function(item, direction) {
+      return getMediaInfoSortValue(item, 'audioInfo', direction);
+    },
+
+    subs: function(item, direction) {
+      return getMediaInfoSortValue(item, 'subs', direction);
     },
 
     indexerFlags: function(item, direction) {
@@ -99,6 +118,24 @@ export const defaultState = {
       const languages = item.languages.map((language) => language.name);
 
       return predicate(languages, filterValue);
+    },
+
+    audioInfo: function(item, filterValue, type) {
+      const predicate = filterTypePredicates[type];
+
+      return predicate(getAudioSummary(item), filterValue);
+    },
+
+    subs: function(item, filterValue, type) {
+      const predicate = filterTypePredicates[type];
+
+      return predicate(getListSummary(item.subs), filterValue);
+    },
+
+    mediaInfoStatus: function(item, filterValue, type) {
+      const predicate = filterTypePredicates[type];
+
+      return predicate(getMediaInfoStatusSummary(item), filterValue);
     },
 
     peers: function(item, value, type) {
@@ -202,6 +239,21 @@ export const defaultState = {
       }
     },
     {
+      name: 'audioInfo',
+      label: () => translate('AudioInfo'),
+      type: filterBuilderTypes.STRING
+    },
+    {
+      name: 'subs',
+      label: () => translate('SubtitleLanguages'),
+      type: filterBuilderTypes.STRING
+    },
+    {
+      name: 'mediaInfoStatus',
+      label: () => translate('AdditionalData'),
+      type: filterBuilderTypes.STRING
+    },
+    {
       name: 'customFormatScore',
       label: () => translate('CustomFormatScore'),
       type: filterBuilderTypes.NUMBER
@@ -252,7 +304,213 @@ export const setReleasesFilter = createAction(SET_RELEASES_FILTER);
 //
 // Helpers
 
-const fetchReleasesHelper = createFetchHandler(section, '/release');
+function formatAudioInfo(audioInfo) {
+  const language = audioInfo.language?.trim();
+  const specification = audioInfo.specification?.trim();
+
+  if (language && specification) {
+    return `${language}: ${specification}`;
+  }
+
+  return language || specification || '';
+}
+
+function getListSummary(values = []) {
+  return values.filter(Boolean).join(', ');
+}
+
+function getAudioSummary(item) {
+  const {
+    audioInfo = []
+  } = item;
+
+  return audioInfo.map(formatAudioInfo).filter(Boolean).join('; ');
+}
+
+function getMediaInfoStatusSummary(item) {
+  if (item.mediaInfoStatus) {
+    return item.mediaInfoStatus;
+  }
+
+  if (item.mediaInfoProgressStatus) {
+    return item.mediaInfoProgressStatus;
+  }
+
+  return '';
+}
+
+function getMediaInfoSortSummary(item, sortKey) {
+  if (sortKey === 'audioInfo') {
+    return getAudioSummary(item);
+  }
+
+  if (sortKey === 'subs') {
+    return getListSummary(item.subs);
+  }
+
+  if (sortKey === 'mediaInfoStatus') {
+    return getMediaInfoStatusSummary(item);
+  }
+
+  return '';
+}
+
+function isMediaInfoSortKey(sortKey) {
+  return mediaInfoSortKeys.includes(sortKey);
+}
+
+function getMediaInfoSortValue(item, sortKey, sortDirection) {
+  const sortValue = item.mediaInfoSortValues?.[sortKey];
+  const normalized = sortValue?.trim().toLocaleLowerCase();
+  const hasValueGroup = sortDirection === sortDirections.DESCENDING ? '1' : '0';
+  const emptyGroup = sortDirection === sortDirections.DESCENDING ? '0' : '1';
+
+  if (!normalized) {
+    return `${emptyGroup}|`;
+  }
+
+  return `${hasValueGroup}|${normalized}`;
+}
+
+function snapshotMediaInfoSortValues(items, sortKey) {
+  return items.map((item) => {
+    return {
+      ...item,
+      mediaInfoSortValues: {
+        ...item.mediaInfoSortValues,
+        [sortKey]: getMediaInfoSortSummary(item, sortKey)
+      }
+    };
+  });
+}
+
+function getMediaInfoProgress(releases = []) {
+  const progressRelease = releases.find((release) => {
+    return release.mediaInfoProgressStatus;
+  });
+
+  if (progressRelease) {
+    const total = progressRelease.mediaInfoProgressTotal || 0;
+    const completed = progressRelease.mediaInfoProgressCompleted || 0;
+
+    return {
+      isMediaInfoFetching: progressRelease.mediaInfoProgressStatus === 'pending',
+      isMediaInfoComplete: progressRelease.mediaInfoProgressStatus === 'completed',
+      mediaInfoTotal: total,
+      mediaInfoCompleted: completed
+    };
+  }
+
+  const pendingCount = releases.filter((release) => {
+    return release.mediaInfoStatus === 'pending';
+  }).length;
+
+  return {
+    isMediaInfoFetching: pendingCount > 0,
+    isMediaInfoComplete: pendingCount === 0,
+    mediaInfoTotal: pendingCount,
+    mediaInfoCompleted: 0
+  };
+}
+
+function hasPendingMediaInfo(releases = []) {
+  return releases.some((release) => {
+    return release.mediaInfoStatus === 'pending' ||
+      release.mediaInfoProgressStatus === 'pending';
+  });
+}
+
+function clearMediaInfoPolling() {
+  mediaInfoSearchId++;
+
+  mediaInfoAbortRequests.forEach((abortRequest) => abortRequest());
+  mediaInfoAbortRequests = [];
+}
+
+function removeMediaInfoAbortRequest(abortRequest) {
+  mediaInfoAbortRequests = mediaInfoAbortRequests.filter((request) => {
+    return request !== abortRequest;
+  });
+}
+
+function fetchReleaseMediaInfo(releases, dispatch) {
+  const pendingReleases = releases.filter((release) => {
+    return release.mediaInfoStatus === 'pending';
+  });
+
+  dispatch(set({
+    section,
+    ...getMediaInfoProgress(releases)
+  }));
+
+  if (!pendingReleases.length) {
+    return;
+  }
+
+  const searchId = mediaInfoSearchId;
+  const queue = [...pendingReleases];
+  let activeRequests = 0;
+
+  function startNext() {
+    if (searchId !== mediaInfoSearchId) {
+      return;
+    }
+
+    while (activeRequests < mediaInfoConcurrency && queue.length) {
+      const {
+        guid,
+        indexerId,
+        prowlarrIndexerId,
+        mediaInfoSearchId: releaseMediaInfoSearchId
+      } = queue.shift();
+
+      activeRequests++;
+
+      const {
+        request,
+        abortRequest
+      } = createAjaxRequest({
+        url: '/release/mediaInfo',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ guid, indexerId, prowlarrIndexerId, mediaInfoSearchId: releaseMediaInfoSearchId })
+      });
+
+      mediaInfoAbortRequests.push(abortRequest);
+
+      request.done((data) => {
+        if (searchId === mediaInfoSearchId) {
+          dispatch(batchActions([
+            updateRelease(data),
+            set({
+              section,
+              ...getMediaInfoProgress([data])
+            })
+          ]));
+        }
+      });
+
+      request.fail((xhr) => {
+        if (searchId === mediaInfoSearchId && !xhr.aborted) {
+          dispatch(updateRelease({
+            guid,
+            indexerId,
+            mediaInfoStatus: 'failed'
+          }));
+        }
+      });
+
+      request.always(() => {
+        activeRequests--;
+        removeMediaInfoAbortRequest(abortRequest);
+
+        startNext();
+      });
+    }
+  }
+
+  startNext();
+}
 
 //
 // Action Handlers
@@ -260,9 +518,67 @@ const fetchReleasesHelper = createFetchHandler(section, '/release');
 export const actionHandlers = handleThunks({
 
   [FETCH_RELEASES]: function(getState, payload, dispatch) {
-    const abortRequest = fetchReleasesHelper(getState, payload, dispatch);
+    clearMediaInfoPolling();
 
-    abortCurrentRequest = abortRequest;
+    dispatch(set({
+      section,
+      isFetching: true,
+      isMediaInfoFetching: false,
+      isMediaInfoComplete: false,
+      mediaInfoTotal: 0,
+      mediaInfoCompleted: 0
+    }));
+
+    const {
+      id,
+      ...otherPayload
+    } = payload;
+
+    const {
+      request,
+      abortRequest
+    } = createAjaxRequest({
+      url: id == null ? '/release' : `/release/${id}`,
+      data: otherPayload,
+      traditional: true
+    });
+
+    request.done((data) => {
+      const releaseState = getSectionState(getState(), section);
+      const releases = id == null && isMediaInfoSortKey(releaseState.sortKey) ?
+        snapshotMediaInfoSortValues(data, releaseState.sortKey) :
+        data;
+
+      dispatch(batchActions([
+        update({ section, data: releases }),
+
+        set({
+          section,
+          isFetching: false,
+          isPopulated: true,
+          error: null,
+          ...getMediaInfoProgress(releases)
+        })
+      ]));
+
+      if (id == null && hasPendingMediaInfo(releases)) {
+        fetchReleaseMediaInfo(releases, dispatch);
+      }
+    });
+
+    request.fail((xhr) => {
+      dispatch(set({
+        section,
+        isFetching: false,
+        isPopulated: false,
+        error: xhr.aborted ? null : xhr
+      }));
+    });
+
+    abortCurrentRequest = function() {
+      abortRequest();
+      clearMediaInfoPolling();
+    };
   },
 
   [CANCEL_FETCH_RELEASES]: function(getState, payload, dispatch) {
@@ -322,9 +638,12 @@ export const reducers = createHandleActions({
 
   [UPDATE_RELEASE]: (state, { payload }) => {
     const guid = payload.guid;
+    const indexerId = payload.indexerId;
     const newState = Object.assign({}, state);
     const items = newState.items;
-    const index = items.findIndex((item) => item.guid === guid);
+    const index = items.findIndex((item) => {
+      return item.guid === guid && (indexerId == null || item.indexerId === indexerId);
+    });
 
     // Don't try to update if there isn't a matching item (the user closed the modal)
     if (index >= 0) {
@@ -338,6 +657,30 @@ export const reducers = createHandleActions({
   },
 
   [SET_RELEASES_FILTER]: createSetClientSideCollectionFilterReducer(section),
-  [SET_RELEASES_SORT]: createSetClientSideCollectionSortReducer(section)
+  [SET_RELEASES_SORT]: (state, { payload }) => {
+    const newState = getSectionState(state, section);
+
+    const sortKey = payload.sortKey || newState.sortKey;
+    let sortDirection = payload.sortDirection;
+
+    if (!sortDirection) {
+      if (payload.sortKey === newState.sortKey) {
+        sortDirection = newState.sortDirection === sortDirections.ASCENDING ?
+          sortDirections.DESCENDING :
+          sortDirections.ASCENDING;
+      } else {
+        sortDirection = newState.sortDirection;
+      }
+    }
+
+    newState.sortKey = sortKey;
+    newState.sortDirection = sortDirection;
+
+    if (isMediaInfoSortKey(sortKey)) {
+      newState.items = snapshotMediaInfoSortValues(newState.items, sortKey);
+    }
+
+    return updateSectionState(state, section, newState);
+  }
 
 }, defaultState, section);

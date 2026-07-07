@@ -79,9 +79,15 @@ const columns: Column[] = [
     isVisible: true,
   },
   {
-    name: 'mediaInfo',
-    label: () => translate('MediaInfo'),
-    isSortable: false,
+    name: 'audioInfo',
+    label: () => translate('AudioInfo'),
+    isSortable: true,
+    isVisible: true,
+  },
+  {
+    name: 'subs',
+    label: () => translate('SubtitleLanguages'),
+    isSortable: true,
     isVisible: true,
   },
   {
@@ -143,6 +149,10 @@ function InteractiveSearch({ searchPayload }: InteractiveSearchProps) {
     customFilters,
     sortKey,
     sortDirection,
+    isMediaInfoFetching,
+    isMediaInfoComplete,
+    mediaInfoTotal,
+    mediaInfoCompleted,
   }: ReleasesAppState & ClientSideCollectionAppState = useSelector(
     createClientSideCollectionSelector('releases')
   );
@@ -207,6 +217,19 @@ function InteractiveSearch({ searchPayload }: InteractiveSearchProps) {
       </div>
 
       {isFetching ? <LoadingIndicator /> : null}
+
+      {isPopulated &&
+      mediaInfoTotal > 0 &&
+      (isMediaInfoFetching || isMediaInfoComplete) ? (
+        <Alert kind={kinds.INFO} className={styles.alert}>
+          {isMediaInfoFetching
+            ? translate('QueryingAdditionalDataProgress', {
+                completed: mediaInfoCompleted,
+                total: mediaInfoTotal,
+              })
+            : translate('AdditionalDataComplete')}
+        </Alert>
+      ) : null}
 
       {!isFetching && error ? (
         <Alert kind={kinds.DANGER} className={styles.alert}>

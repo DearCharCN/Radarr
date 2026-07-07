@@ -2,6 +2,7 @@
 // Please do not change this file!
 interface CssExports {
   'age': string;
+  'audioInfo': string;
   'blocklist': string;
   'customFormatScore': string;
   'download': string;
@@ -12,13 +13,14 @@ interface CssExports {
   'interactiveIcon': string;
   'languages': string;
   'manualDownloadContent': string;
-  'media': string;
-  'mediaText': string;
+  'mediaCellContent': string;
+  'mediaLoadingIcon': string;
   'peers': string;
   'protocol': string;
   'quality': string;
   'rejected': string;
   'size': string;
+  'subs': string;
   'titleContent': string;
 }
 export const cssExports: CssExports;

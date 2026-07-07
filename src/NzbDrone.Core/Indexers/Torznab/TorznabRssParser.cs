@@ -136,6 +136,31 @@ namespace NzbDrone.Core.Indexers.Torznab
                 .ToList();
         }
 
+        protected override string GetMediaInfoStatus(XElement item)
+        {
+            return TryGetTorznabAttribute(item, "mediaInfoStatus");
+        }
+
+        protected override string GetMediaInfoSearchId(XElement item)
+        {
+            return TryGetTorznabAttribute(item, "mediaInfoSearchId");
+        }
+
+        protected override string GetMediaInfoProgressStatus(XElement item)
+        {
+            return TryGetTorznabAttribute(item, "mediaInfoProgressStatus");
+        }
+
+        protected override int GetMediaInfoProgressCompleted(XElement item)
+        {
+            return GetIntTorznabAttribute(item, "mediaInfoProgressCompleted");
+        }
+
+        protected override int GetMediaInfoProgressTotal(XElement item)
+        {
+            return GetIntTorznabAttribute(item, "mediaInfoProgressTotal");
+        }
+
         protected override long GetSize(XElement item)
         {
             var sizeString = TryGetTorznabAttribute(item, "size");
@@ -296,6 +321,18 @@ namespace NzbDrone.Core.Indexers.Torznab
             var attr = TryGetTorznabAttribute(item, key, defaultValue.ToString());
 
             if (float.TryParse(attr, out var result))
+            {
+                return result;
+            }
+
+            return defaultValue;
+        }
+
+        protected int GetIntTorznabAttribute(XElement item, string key, int defaultValue = 0)
+        {
+            var attr = TryGetTorznabAttribute(item, key, defaultValue.ToString());
+
+            if (int.TryParse(attr, out var result))
             {
                 return result;
             }

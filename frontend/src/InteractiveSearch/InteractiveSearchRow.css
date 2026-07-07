@@ -19,7 +19,8 @@
 
 .quality,
 .languages,
-.media {
+.audioInfo,
+.subs {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 }
 
@@ -31,12 +32,25 @@
   width: 100px;
 }
 
-.media {
-  width: 150px;
+.audioInfo {
+  width: 180px;
+  max-width: 180px;
 }
 
-.mediaText {
-  cursor: default;
+.subs {
+  width: 130px;
+  max-width: 130px;
+}
+
+.mediaCellContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+}
+
+.mediaLoadingIcon {
+  flex: 0 0 auto;
 }
 
 .customFormatScore {

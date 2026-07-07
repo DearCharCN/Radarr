@@ -162,9 +162,15 @@ namespace NzbDrone.Core.Indexers
             releaseInfo.DownloadUrl = GetDownloadUrl(item);
             releaseInfo.InfoUrl = GetInfoUrl(item);
             releaseInfo.CommentUrl = GetCommentUrl(item);
+            releaseInfo.ProwlarrIndexerId = GetProwlarrIndexerId(item);
             releaseInfo.Languages = GetLanguages(item);
             releaseInfo.Subs = GetSubs(item);
             releaseInfo.AudioInfo = GetAudioInfo(item);
+            releaseInfo.MediaInfoStatus = GetMediaInfoStatus(item);
+            releaseInfo.MediaInfoSearchId = GetMediaInfoSearchId(item);
+            releaseInfo.MediaInfoProgressStatus = GetMediaInfoProgressStatus(item);
+            releaseInfo.MediaInfoProgressCompleted = GetMediaInfoProgressCompleted(item);
+            releaseInfo.MediaInfoProgressTotal = GetMediaInfoProgressTotal(item);
 
             try
             {
@@ -231,6 +237,18 @@ namespace NzbDrone.Core.Indexers
             return ParseUrl((string)item.Element("comments"));
         }
 
+        protected virtual int GetProwlarrIndexerId(XElement item)
+        {
+            var prowlarrIndexerId = item.Element("prowlarrindexer")?.Attribute("id")?.Value;
+
+            if (!prowlarrIndexerId.IsNullOrWhiteSpace() && int.TryParse(prowlarrIndexerId, out var indexerId))
+            {
+                return indexerId;
+            }
+
+            return 0;
+        }
+
         protected virtual List<Language> GetLanguages(XElement item)
         {
             return new List<Language>();
@@ -244,6 +262,31 @@ namespace NzbDrone.Core.Indexers
         protected virtual List<ReleaseAudioInfo> GetAudioInfo(XElement item)
         {
             return new List<ReleaseAudioInfo>();
+        }
+
+        protected virtual string GetMediaInfoStatus(XElement item)
+        {
+            return null;
+        }
+
+        protected virtual string GetMediaInfoSearchId(XElement item)
+        {
+            return null;
+        }
+
+        protected virtual string GetMediaInfoProgressStatus(XElement item)
+        {
+            return null;
+        }
+
+        protected virtual int GetMediaInfoProgressCompleted(XElement item)
+        {
+            return 0;
+        }
+
+        protected virtual int GetMediaInfoProgressTotal(XElement item)
+        {
+            return 0;
         }
 
         protected static List<string> SplitNabAttributeValues(IEnumerable<string> values)

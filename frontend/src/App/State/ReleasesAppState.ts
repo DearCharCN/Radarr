@@ -5,6 +5,11 @@ import Release from 'typings/Release';
 
 interface ReleasesAppState
   extends AppSectionState<Release>,
-    AppSectionFilterState<Release> {}
+    AppSectionFilterState<Release> {
+  isMediaInfoFetching: boolean;
+  isMediaInfoComplete: boolean;
+  mediaInfoTotal: number;
+  mediaInfoCompleted: number;
+}
 
 export default ReleasesAppState;

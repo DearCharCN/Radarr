@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -7,10 +8,13 @@ using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Common.Http;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
@@ -30,6 +34,8 @@ namespace Radarr.Api.V3.Indexers
         private readonly IPrioritizeDownloadDecision _prioritizeDownloadDecision;
         private readonly IDownloadService _downloadService;
         private readonly IMovieService _movieService;
+        private readonly IIndexerFactory _indexerFactory;
+        private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
         private readonly ICached<RemoteMovie> _remoteMovieCache;
@@ -40,6 +46,8 @@ namespace Radarr.Api.V3.Indexers
                              IPrioritizeDownloadDecision prioritizeDownloadDecision,
                              IDownloadService downloadService,
                              IMovieService movieService,
+                             IIndexerFactory indexerFactory,
+                             IHttpClient httpClient,
                              ICacheManager cacheManager,
                              IQualityProfileService qualityProfileService,
                              Logger logger)
@@ -51,6 +59,8 @@ namespace Radarr.Api.V3.Indexers
             _prioritizeDownloadDecision = prioritizeDownloadDecision;
             _downloadService = downloadService;
             _movieService = movieService;
+            _indexerFactory = indexerFactory;
+            _httpClient = httpClient;
             _logger = logger;
 
             PostValidator.RuleFor(s => s.IndexerId).ValidId();
@@ -124,6 +134,91 @@ namespace Radarr.Api.V3.Indexers
             return release;
         }
 
+        [HttpPost("mediaInfo")]
+        [Consumes("application/json")]
+        [Produces("application/json")]
+        public ActionResult<ReleaseMediaInfoResource> GetReleaseMediaInfo([FromBody] ReleaseMediaInfoResource release)
+        {
+            if (release == null || release.Guid.IsNullOrWhiteSpace() || release.IndexerId <= 0)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Invalid release mediaInfo request");
+            }
+
+            var remoteMovie = _remoteMovieCache.Find(GetCacheKey(release.IndexerId, release.Guid));
+
+            if (remoteMovie == null)
+            {
+                _logger.Debug("Couldn't find requested release mediaInfo source in cache, cache timeout probably expired.");
+
+                throw new NzbDroneClientException(HttpStatusCode.NotFound, "Couldn't find requested release in cache, try searching again");
+            }
+
+            var indexer = _indexerFactory.Get(release.IndexerId);
+            var settings = indexer?.Settings as NewznabSettings;
+
+            if (settings == null)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Release mediaInfo is only available for Newznab/Torznab indexers");
+            }
+
+            var request = new HttpRequestBuilder(BuildProwlarrMediaInfoUrl(settings))
+                .Post()
+                .Build();
+            var prowlarrIndexerId = release.ProwlarrIndexerId > 0 ? release.ProwlarrIndexerId : remoteMovie.Release.ProwlarrIndexerId;
+
+            if (prowlarrIndexerId <= 0)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Release mediaInfo is missing the Prowlarr indexer id");
+            }
+
+            request.Headers.ContentType = "application/json";
+            request.SetContent(new
+            {
+                release.Guid,
+                IndexerId = prowlarrIndexerId,
+                release.MediaInfoSearchId
+            }.ToJson());
+            request.ContentSummary = $"{{ \"guid\": \"{release.Guid}\", \"indexerId\": {prowlarrIndexerId}, \"mediaInfoSearchId\": \"{release.MediaInfoSearchId}\" }}";
+            request.SuppressHttpError = true;
+
+            if (settings.ApiKey.IsNotNullOrWhiteSpace())
+            {
+                request.Headers.Set("X-Api-Key", settings.ApiKey);
+            }
+
+            var response = _httpClient.Post<ReleaseMediaInfoResource>(request);
+
+            if (response.HasHttpError)
+            {
+                _logger.Debug("Prowlarr mediaInfo request failed for release '{0}' from indexer {1} with status {2}", release.Guid, release.IndexerId, response.StatusCode);
+
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Getting release mediaInfo from Prowlarr failed");
+            }
+
+            var result = response.Resource;
+
+            if (result == null)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Getting release mediaInfo from Prowlarr returned no data");
+            }
+
+            remoteMovie.Release.Subs = result.Subs ?? remoteMovie.Release.Subs;
+            remoteMovie.Release.AudioInfo = result.AudioInfo ?? remoteMovie.Release.AudioInfo;
+            remoteMovie.Release.MediaInfoStatus = result.MediaInfoStatus;
+            remoteMovie.Release.MediaInfoSearchId = result.MediaInfoSearchId;
+            remoteMovie.Release.MediaInfoProgressStatus = result.MediaInfoProgressStatus;
+            remoteMovie.Release.MediaInfoProgressCompleted = result.MediaInfoProgressCompleted;
+            remoteMovie.Release.MediaInfoProgressTotal = result.MediaInfoProgressTotal;
+            remoteMovie.Release.ProwlarrIndexerId = prowlarrIndexerId;
+
+            _remoteMovieCache.Set(GetCacheKey(release.IndexerId, release.Guid), remoteMovie, TimeSpan.FromMinutes(30));
+
+            result.IndexerId = release.IndexerId;
+            result.ProwlarrIndexerId = prowlarrIndexerId;
+
+            return Ok(result);
+        }
+
         [HttpGet]
         [Produces("application/json")]
         public async Task<List<ReleaseResource>> GetReleases(int? movieId)
@@ -176,6 +271,42 @@ namespace Radarr.Api.V3.Indexers
         private string GetCacheKey(ReleaseResource resource)
         {
             return string.Concat(resource.IndexerId, "_", resource.Guid);
+        }
+
+        private string GetCacheKey(int indexerId, string guid)
+        {
+            return string.Concat(indexerId, "_", guid);
+        }
+
+        private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings)
+        {
+            var baseUrl = settings.BaseUrl.TrimEnd('/');
+            var apiPath = settings.ApiPath.IsNullOrWhiteSpace() ? "/api" : settings.ApiPath;
+            var combinedUrl = $"{baseUrl}/{apiPath.TrimStart('/')}";
+            var uriBuilder = new UriBuilder(combinedUrl);
+            var segments = uriBuilder.Path
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+
+            if (segments.Count > 0 && segments.Last().Equals("api", StringComparison.OrdinalIgnoreCase))
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+
+            if (segments.Count > 0 && int.TryParse(segments.Last(), out _))
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+
+            segments.Add("api");
+            segments.Add("v1");
+            segments.Add("search");
+            segments.Add("mediaInfo");
+
+            uriBuilder.Path = string.Join("/", segments);
+            uriBuilder.Query = string.Empty;
+
+            return uriBuilder.Uri.AbsoluteUri;
         }
     }
 }

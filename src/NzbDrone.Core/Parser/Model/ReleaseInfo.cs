@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Parser.Model
         public string InfoUrl { get; set; }
         public string CommentUrl { get; set; }
         public int IndexerId { get; set; }
+        public int ProwlarrIndexerId { get; set; }
         public string Indexer { get; set; }
         public int IndexerPriority { get; set; }
         public DownloadProtocol DownloadProtocol { get; set; }
@@ -40,6 +41,11 @@ namespace NzbDrone.Core.Parser.Model
         public List<Language> Languages { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public string MediaInfoStatus { get; set; }
+        public string MediaInfoSearchId { get; set; }
+        public string MediaInfoProgressStatus { get; set; }
+        public int MediaInfoProgressCompleted { get; set; }
+        public int MediaInfoProgressTotal { get; set; }
 
         [JsonIgnore]
         public IndexerFlags IndexerFlags { get; set; }

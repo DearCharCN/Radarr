@@ -25,6 +25,7 @@ namespace Radarr.Api.V3.Indexers
         public double AgeMinutes { get; set; }
         public long Size { get; set; }
         public int IndexerId { get; set; }
+        public int ProwlarrIndexerId { get; set; }
         public string Indexer { get; set; }
         public string ReleaseGroup { get; set; }
         public string SubGroup { get; set; }
@@ -35,6 +36,11 @@ namespace Radarr.Api.V3.Indexers
         public List<Language> Languages { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public string MediaInfoStatus { get; set; }
+        public string MediaInfoSearchId { get; set; }
+        public string MediaInfoProgressStatus { get; set; }
+        public int MediaInfoProgressCompleted { get; set; }
+        public int MediaInfoProgressTotal { get; set; }
         public int? MappedMovieId { get; set; }
         public bool Approved { get; set; }
         public bool TemporarilyRejected { get; set; }
@@ -72,6 +78,20 @@ namespace Radarr.Api.V3.Indexers
         public bool? ShouldOverride { get; set; }
     }
 
+    public class ReleaseMediaInfoResource : RestResource
+    {
+        public string Guid { get; set; }
+        public int IndexerId { get; set; }
+        public int ProwlarrIndexerId { get; set; }
+        public List<string> Subs { get; set; }
+        public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public string MediaInfoStatus { get; set; }
+        public string MediaInfoSearchId { get; set; }
+        public string MediaInfoProgressStatus { get; set; }
+        public int MediaInfoProgressCompleted { get; set; }
+        public int MediaInfoProgressTotal { get; set; }
+    }
+
     public static class ReleaseResourceMapper
     {
         public static ReleaseResource ToResource(this DownloadDecision model)
@@ -96,6 +116,7 @@ namespace Radarr.Api.V3.Indexers
                 AgeMinutes = releaseInfo.AgeMinutes,
                 Size = releaseInfo.Size,
                 IndexerId = releaseInfo.IndexerId,
+                ProwlarrIndexerId = releaseInfo.ProwlarrIndexerId,
                 Indexer = releaseInfo.Indexer,
                 ReleaseGroup = parsedMovieInfo.ReleaseGroup,
                 ReleaseHash = parsedMovieInfo.ReleaseHash,
@@ -104,6 +125,11 @@ namespace Radarr.Api.V3.Indexers
                 Languages = remoteMovie.Languages,
                 Subs = releaseInfo.Subs,
                 AudioInfo = releaseInfo.AudioInfo,
+                MediaInfoStatus = releaseInfo.MediaInfoStatus,
+                MediaInfoSearchId = releaseInfo.MediaInfoSearchId,
+                MediaInfoProgressStatus = releaseInfo.MediaInfoProgressStatus,
+                MediaInfoProgressCompleted = releaseInfo.MediaInfoProgressCompleted,
+                MediaInfoProgressTotal = releaseInfo.MediaInfoProgressTotal,
                 MappedMovieId = remoteMovie.Movie?.Id,
                 Approved = model.Approved,
                 TemporarilyRejected = model.TemporarilyRejected,
@@ -160,6 +186,7 @@ namespace Radarr.Api.V3.Indexers
             model.InfoUrl = resource.InfoUrl;
             model.CommentUrl = resource.CommentUrl;
             model.IndexerId = resource.IndexerId;
+            model.ProwlarrIndexerId = resource.ProwlarrIndexerId;
             model.Indexer = resource.Indexer;
             model.DownloadProtocol = resource.Protocol;
             model.TmdbId = resource.TmdbId;
@@ -168,6 +195,11 @@ namespace Radarr.Api.V3.Indexers
             model.Languages = resource.Languages ?? new List<Language>();
             model.Subs = resource.Subs ?? new List<string>();
             model.AudioInfo = resource.AudioInfo ?? new List<ReleaseAudioInfo>();
+            model.MediaInfoStatus = resource.MediaInfoStatus;
+            model.MediaInfoSearchId = resource.MediaInfoSearchId;
+            model.MediaInfoProgressStatus = resource.MediaInfoProgressStatus;
+            model.MediaInfoProgressCompleted = resource.MediaInfoProgressCompleted;
+            model.MediaInfoProgressTotal = resource.MediaInfoProgressTotal;
 
             return model;
         }

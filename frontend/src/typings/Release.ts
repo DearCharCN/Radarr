@@ -18,6 +18,7 @@ interface Release {
   title: string;
   infoUrl: string;
   indexerId: number;
+  prowlarrIndexerId?: number;
   indexer: string;
   size: number;
   seeders?: number;
@@ -26,6 +27,11 @@ interface Release {
   languages: Language[];
   subs: string[];
   audioInfo: ReleaseAudioInfo[];
+  mediaInfoStatus?: string;
+  mediaInfoSearchId?: string;
+  mediaInfoProgressStatus?: string;
+  mediaInfoProgressCompleted?: number;
+  mediaInfoProgressTotal?: number;
   customFormats: CustomFormat[];
   customFormatScore: number;
   mappedMovieId?: number;

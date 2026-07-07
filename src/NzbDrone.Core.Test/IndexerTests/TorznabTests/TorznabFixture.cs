@@ -154,6 +154,11 @@ namespace NzbDrone.Core.Test.IndexerTests.TorznabTests
       <torznab:attr name=""subs"" value=""Chinese"" />
       <torznab:attr name=""audio"" value=""English: TrueHD 7.1 Atmos"" />
       <torznab:attr name=""audio"" value=""Chinese: DDP 5.1"" />
+      <torznab:attr name=""mediaInfoStatus"" value=""pending"" />
+      <torznab:attr name=""mediaInfoSearchId"" value=""search-1"" />
+      <torznab:attr name=""mediaInfoProgressStatus"" value=""pending"" />
+      <torznab:attr name=""mediaInfoProgressCompleted"" value=""3"" />
+      <torznab:attr name=""mediaInfoProgressTotal"" value=""11"" />
     </item>
   </channel>
 </rss>";
@@ -175,6 +180,11 @@ namespace NzbDrone.Core.Test.IndexerTests.TorznabTests
             releaseInfo.AudioInfo.First().Specification.Should().Be("TrueHD 7.1 Atmos");
             releaseInfo.AudioInfo.Last().Language.Should().Be("Chinese");
             releaseInfo.AudioInfo.Last().Specification.Should().Be("DDP 5.1");
+            releaseInfo.MediaInfoStatus.Should().Be("pending");
+            releaseInfo.MediaInfoSearchId.Should().Be("search-1");
+            releaseInfo.MediaInfoProgressStatus.Should().Be("pending");
+            releaseInfo.MediaInfoProgressCompleted.Should().Be(3);
+            releaseInfo.MediaInfoProgressTotal.Should().Be(11);
         }
 
         [Test]
