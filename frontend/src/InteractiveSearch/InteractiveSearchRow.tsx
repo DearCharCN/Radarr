@@ -16,7 +16,7 @@ import MovieFormats from 'Movie/MovieFormats';
 import MovieLanguages from 'Movie/MovieLanguages';
 import MovieQuality from 'Movie/MovieQuality';
 import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
-import Release from 'typings/Release';
+import Release, { ReleaseAudioInfo } from 'typings/Release';
 import formatDateTime from 'Utilities/Date/formatDateTime';
 import formatAge from 'Utilities/Number/formatAge';
 import formatBytes from 'Utilities/Number/formatBytes';
@@ -69,6 +69,31 @@ function getDownloadTooltip(
   }
 
   return translate('AddToDownloadQueue');
+}
+
+function formatAudioInfo(audioInfo: ReleaseAudioInfo) {
+  const language = audioInfo.language?.trim();
+  const specification = audioInfo.specification?.trim();
+
+  if (language && specification) {
+    return `${language}: ${specification}`;
+  }
+
+  return language || specification || '';
+}
+
+function getMediaSummary(audioInfo: ReleaseAudioInfo[], subs: string[]) {
+  const parts: string[] = [];
+
+  if (audioInfo.length) {
+    parts.push(`${audioInfo.length} audio`);
+  }
+
+  if (subs.length) {
+    parts.push(`${subs.length} subs`);
+  }
+
+  return parts.join(' / ');
 }
 
 function releaseHistorySelector({ guid }: Release) {
@@ -127,6 +152,8 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
     leechers,
     quality,
     languages,
+    subs = [],
+    audioInfo = [],
     customFormatScore,
     customFormats,
     mappedMovieId,
@@ -149,6 +176,8 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
 
   const [isConfirmGrabModalOpen, setIsConfirmGrabModalOpen] = useState(false);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const audioDetails = audioInfo.map(formatAudioInfo).filter(Boolean);
+  const mediaSummary = getMediaSummary(audioInfo, subs);
 
   const onGrabPressWrapper = useCallback(() => {
     if (downloadAllowed) {
@@ -278,6 +307,41 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
 
       <TableRowCell className={styles.languages}>
         <MovieLanguages languages={languages} />
+      </TableRowCell>
+
+      <TableRowCell className={styles.media}>
+        {mediaSummary ? (
+          <Popover
+            anchor={<span className={styles.mediaText}>{mediaSummary}</span>}
+            title={translate('MediaInfo')}
+            body={
+              <div>
+                {audioDetails.length ? (
+                  <>
+                    <div>{translate('AudioInfo')}</div>
+                    <ul>
+                      {audioDetails.map((audio, index) => {
+                        return <li key={index}>{audio}</li>;
+                      })}
+                    </ul>
+                  </>
+                ) : null}
+
+                {subs.length ? (
+                  <>
+                    <div>{translate('SubtitleLanguages')}</div>
+                    <ul>
+                      {subs.map((subtitle, index) => {
+                        return <li key={index}>{subtitle}</li>;
+                      })}
+                    </ul>
+                  </>
+                ) : null}
+              </div>
+            }
+            position={tooltipPositions.LEFT}
+          />
+        ) : null}
       </TableRowCell>
 
       <TableRowCell className={styles.quality}>

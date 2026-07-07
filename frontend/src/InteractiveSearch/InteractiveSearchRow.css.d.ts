@@ -12,6 +12,8 @@ interface CssExports {
   'interactiveIcon': string;
   'languages': string;
   'manualDownloadContent': string;
+  'media': string;
+  'mediaText': string;
   'peers': string;
   'protocol': string;
   'quality': string;

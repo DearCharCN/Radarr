@@ -123,6 +123,19 @@ namespace NzbDrone.Core.Indexers.Torznab
             return results;
         }
 
+        protected override List<string> GetSubs(XElement item)
+        {
+            return SplitNabAttributeValues(TryGetMultipleTorznabAttributes(item, "subs"));
+        }
+
+        protected override List<ReleaseAudioInfo> GetAudioInfo(XElement item)
+        {
+            return TryGetMultipleTorznabAttributes(item, "audio")
+                .Select(ParseAudioInfo)
+                .Where(v => v != null)
+                .ToList();
+        }
+
         protected override long GetSize(XElement item)
         {
             var sizeString = TryGetTorznabAttribute(item, "size");

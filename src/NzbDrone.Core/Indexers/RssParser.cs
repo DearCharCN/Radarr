@@ -163,6 +163,8 @@ namespace NzbDrone.Core.Indexers
             releaseInfo.InfoUrl = GetInfoUrl(item);
             releaseInfo.CommentUrl = GetCommentUrl(item);
             releaseInfo.Languages = GetLanguages(item);
+            releaseInfo.Subs = GetSubs(item);
+            releaseInfo.AudioInfo = GetAudioInfo(item);
 
             try
             {
@@ -232,6 +234,49 @@ namespace NzbDrone.Core.Indexers
         protected virtual List<Language> GetLanguages(XElement item)
         {
             return new List<Language>();
+        }
+
+        protected virtual List<string> GetSubs(XElement item)
+        {
+            return new List<string>();
+        }
+
+        protected virtual List<ReleaseAudioInfo> GetAudioInfo(XElement item)
+        {
+            return new List<ReleaseAudioInfo>();
+        }
+
+        protected static List<string> SplitNabAttributeValues(IEnumerable<string> values)
+        {
+            return values.SelectMany(v => v.Split(',',
+                                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                         .Where(v => v.IsNotNullOrWhiteSpace())
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .ToList();
+        }
+
+        protected static ReleaseAudioInfo ParseAudioInfo(string value)
+        {
+            if (value.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            var parts = value.Split(':', 2, StringSplitOptions.TrimEntries);
+
+            if (parts.Length == 2)
+            {
+                return new ReleaseAudioInfo
+                {
+                    Language = parts[0],
+                    Specification = parts[1]
+                };
+            }
+
+            return new ReleaseAudioInfo
+            {
+                Specification = value.Trim()
+            };
         }
 
         protected virtual long GetSize(XElement item)

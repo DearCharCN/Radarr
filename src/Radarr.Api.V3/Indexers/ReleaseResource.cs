@@ -33,6 +33,8 @@ namespace Radarr.Api.V3.Indexers
         public bool SceneSource { get; set; }
         public List<string> MovieTitles { get; set; }
         public List<Language> Languages { get; set; }
+        public List<string> Subs { get; set; }
+        public List<ReleaseAudioInfo> AudioInfo { get; set; }
         public int? MappedMovieId { get; set; }
         public bool Approved { get; set; }
         public bool TemporarilyRejected { get; set; }
@@ -100,6 +102,8 @@ namespace Radarr.Api.V3.Indexers
                 Title = releaseInfo.Title,
                 MovieTitles = parsedMovieInfo.MovieTitles,
                 Languages = remoteMovie.Languages,
+                Subs = releaseInfo.Subs,
+                AudioInfo = releaseInfo.AudioInfo,
                 MappedMovieId = remoteMovie.Movie?.Id,
                 Approved = model.Approved,
                 TemporarilyRejected = model.TemporarilyRejected,
@@ -161,6 +165,9 @@ namespace Radarr.Api.V3.Indexers
             model.TmdbId = resource.TmdbId;
             model.ImdbId = resource.ImdbId;
             model.PublishDate = resource.PublishDate.ToUniversalTime();
+            model.Languages = resource.Languages ?? new List<Language>();
+            model.Subs = resource.Subs ?? new List<string>();
+            model.AudioInfo = resource.AudioInfo ?? new List<ReleaseAudioInfo>();
 
             return model;
         }

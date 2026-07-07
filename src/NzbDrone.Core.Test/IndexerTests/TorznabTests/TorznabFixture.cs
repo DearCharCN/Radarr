@@ -10,6 +10,7 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.Indexers.Torznab;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Core.Validation;
@@ -131,6 +132,49 @@ namespace NzbDrone.Core.Test.IndexerTests.TorznabTests
             releaseInfo.InfoHash.Should().Be("2d69a861bef5a9f2cdf791b7328e37b7953205e1");
             releaseInfo.Seeders.Should().BeNull();
             releaseInfo.Peers.Should().BeNull();
+        }
+
+        [Test]
+        public async Task should_parse_media_info_attributes()
+        {
+            var recentFeed = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<rss version=""1.0"" xmlns:torznab=""http://torznab.com/schemas/2015/feed"">
+  <channel>
+    <item>
+      <title>Example Movie 2024 2160p UHD BluRay REMUX HEVC TrueHD 7.1</title>
+      <guid>https://indexer.local/details/1</guid>
+      <comments>https://indexer.local/details/1</comments>
+      <pubDate>Sat, 14 Mar 2015 17:10:42 -0400</pubDate>
+      <enclosure url=""https://indexer.local/download/1.torrent"" length=""123456789"" type=""application/x-bittorrent"" />
+      <torznab:attr name=""category"" value=""2000"" />
+      <torznab:attr name=""size"" value=""123456789"" />
+      <torznab:attr name=""language"" value=""English"" />
+      <torznab:attr name=""language"" value=""Chinese"" />
+      <torznab:attr name=""subs"" value=""English"" />
+      <torznab:attr name=""subs"" value=""Chinese"" />
+      <torznab:attr name=""audio"" value=""English: TrueHD 7.1 Atmos"" />
+      <torznab:attr name=""audio"" value=""Chinese: DDP 5.1"" />
+    </item>
+  </channel>
+</rss>";
+
+            Mocker.GetMock<IHttpClient>()
+                .Setup(o => o.ExecuteAsync(It.Is<HttpRequest>(v => v.Method == HttpMethod.Get)))
+                .Returns<HttpRequest>(r => Task.FromResult(new HttpResponse(r, new HttpHeader(), recentFeed)));
+
+            var releases = await Subject.FetchRecent();
+
+            releases.Should().HaveCount(1);
+
+            var releaseInfo = releases.First() as TorrentInfo;
+
+            releaseInfo.Languages.Should().BeEquivalentTo(new[] { Language.English, Language.Chinese });
+            releaseInfo.Subs.Should().BeEquivalentTo(new[] { "English", "Chinese" });
+            releaseInfo.AudioInfo.Should().HaveCount(2);
+            releaseInfo.AudioInfo.First().Language.Should().Be("English");
+            releaseInfo.AudioInfo.First().Specification.Should().Be("TrueHD 7.1 Atmos");
+            releaseInfo.AudioInfo.Last().Language.Should().Be("Chinese");
+            releaseInfo.AudioInfo.Last().Specification.Should().Be("DDP 5.1");
         }
 
         [Test]

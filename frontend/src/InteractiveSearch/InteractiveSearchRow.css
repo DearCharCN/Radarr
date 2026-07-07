@@ -18,7 +18,8 @@
 }
 
 .quality,
-.languages {
+.languages,
+.media {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 }
 
@@ -28,6 +29,14 @@
 
 .languages {
   width: 100px;
+}
+
+.media {
+  width: 150px;
+}
+
+.mediaText {
+  cursor: default;
 }
 
 .customFormatScore {

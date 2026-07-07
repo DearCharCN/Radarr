@@ -139,6 +139,19 @@ namespace NzbDrone.Core.Indexers.Newznab
             return results;
         }
 
+        protected override List<string> GetSubs(XElement item)
+        {
+            return SplitNabAttributeValues(TryGetMultipleNewznabAttributes(item, "subs"));
+        }
+
+        protected override List<ReleaseAudioInfo> GetAudioInfo(XElement item)
+        {
+            return TryGetMultipleNewznabAttributes(item, "audio")
+                .Select(ParseAudioInfo)
+                .Where(v => v != null)
+                .ToList();
+        }
+
         protected override long GetSize(XElement item)
         {
             var sizeString = TryGetNewznabAttribute(item, "size");

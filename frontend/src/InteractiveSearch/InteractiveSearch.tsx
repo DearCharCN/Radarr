@@ -79,6 +79,12 @@ const columns: Column[] = [
     isVisible: true,
   },
   {
+    name: 'mediaInfo',
+    label: () => translate('MediaInfo'),
+    isSortable: false,
+    isVisible: true,
+  },
+  {
     name: 'qualityWeight',
     label: () => translate('Quality'),
     isSortable: true,

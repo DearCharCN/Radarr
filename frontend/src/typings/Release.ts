@@ -3,6 +3,11 @@ import Language from 'Language/Language';
 import { QualityModel } from 'Quality/Quality';
 import CustomFormat from 'typings/CustomFormat';
 
+export interface ReleaseAudioInfo {
+  language?: string;
+  specification?: string;
+}
+
 interface Release {
   guid: string;
   protocol: DownloadProtocol;
@@ -19,6 +24,8 @@ interface Release {
   leechers?: number;
   quality: QualityModel;
   languages: Language[];
+  subs: string[];
+  audioInfo: ReleaseAudioInfo[];
   customFormats: CustomFormat[];
   customFormatScore: number;
   mappedMovieId?: number;

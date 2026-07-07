@@ -13,6 +13,8 @@ namespace NzbDrone.Core.Parser.Model
         public ReleaseInfo()
         {
             Languages = new List<Language>();
+            Subs = new List<string>();
+            AudioInfo = new List<ReleaseAudioInfo>();
         }
 
         public string Guid { get; set; }
@@ -36,6 +38,8 @@ namespace NzbDrone.Core.Parser.Model
         public string Resolution { get; set; }
 
         public List<Language> Languages { get; set; }
+        public List<string> Subs { get; set; }
+        public List<ReleaseAudioInfo> AudioInfo { get; set; }
 
         [JsonIgnore]
         public IndexerFlags IndexerFlags { get; set; }
