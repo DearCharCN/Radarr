@@ -420,6 +420,26 @@ function hasPendingMediaInfo(releases = []) {
   });
 }
 
+function mergeReleaseMediaInfo(releases, payload) {
+  const index = releases.findIndex((release) => {
+    return release.guid === payload.guid &&
+      (payload.indexerId == null || release.indexerId === payload.indexerId);
+  });
+
+  if (index < 0) {
+    return releases;
+  }
+
+  const updatedRelease = {
+    ...releases[index],
+    ...payload
+  };
+  const updatedReleases = [...releases];
+  updatedReleases.splice(index, 1, updatedRelease);
+
+  return updatedReleases;
+}
+
 function clearMediaInfoPolling() {
   mediaInfoSearchId++;
 
@@ -433,7 +453,7 @@ function removeMediaInfoAbortRequest(abortRequest) {
   });
 }
 
-function fetchReleaseMediaInfo(releases, dispatch) {
+function fetchReleaseMediaInfo(releases, dispatch, getState) {
   const pendingReleases = releases.filter((release) => {
     return release.mediaInfoStatus === 'pending';
   });
@@ -480,11 +500,14 @@ function fetchReleaseMediaInfo(releases, dispatch) {
 
       request.done((data) => {
         if (searchId === mediaInfoSearchId) {
+          const releaseState = getSectionState(getState(), section);
+          const updatedReleases = mergeReleaseMediaInfo(releaseState.items, data);
+
           dispatch(batchActions([
-            updateRelease(data),
+            update({ section, data: updatedReleases }),
             set({
               section,
-              ...getMediaInfoProgress([data])
+              ...getMediaInfoProgress(updatedReleases)
             })
           ]));
         }
@@ -492,11 +515,20 @@ function fetchReleaseMediaInfo(releases, dispatch) {
 
       request.fail((xhr) => {
         if (searchId === mediaInfoSearchId && !xhr.aborted) {
-          dispatch(updateRelease({
+          const releaseState = getSectionState(getState(), section);
+          const updatedReleases = mergeReleaseMediaInfo(releaseState.items, {
             guid,
             indexerId,
             mediaInfoStatus: 'failed'
-          }));
+          });
+
+          dispatch(batchActions([
+            update({ section, data: updatedReleases }),
+            set({
+              section,
+              ...getMediaInfoProgress(updatedReleases)
+            })
+          ]));
         }
       });
 
@@ -562,7 +594,7 @@ export const actionHandlers = handleThunks({
       ]));
 
       if (id == null && hasPendingMediaInfo(releases)) {
-        fetchReleaseMediaInfo(releases, dispatch);
+        fetchReleaseMediaInfo(releases, dispatch, getState);
       }
     });
 

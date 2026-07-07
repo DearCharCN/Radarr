@@ -28,8 +28,9 @@ function FilterBuilderGroup(props) {
     filterBuilderProps,
     onGroupChange,
     onFilterChange,
-    onAddFilterPress,
-    onAddGroupPress,
+    onAddFilterToGroupPress,
+    onAddGroupToGroupPress,
+    onAddFilterAfterPress,
     onRemovePress
   } = props;
 
@@ -41,11 +42,11 @@ function FilterBuilderGroup(props) {
   };
 
   const onAddFilter = () => {
-    onAddFilterPress(path);
+    onAddFilterToGroupPress(path);
   };
 
   const onAddGroup = () => {
-    onAddGroupPress(path);
+    onAddGroupToGroupPress(path);
   };
 
   const onRemoveGroup = () => {
@@ -106,8 +107,9 @@ function FilterBuilderGroup(props) {
                   filterBuilderProps={filterBuilderProps}
                   onGroupChange={onGroupChange}
                   onFilterChange={onFilterChange}
-                  onAddFilterPress={onAddFilterPress}
-                  onAddGroupPress={onAddGroupPress}
+                  onAddFilterToGroupPress={onAddFilterToGroupPress}
+                  onAddGroupToGroupPress={onAddGroupToGroupPress}
+                  onAddFilterAfterPress={onAddFilterAfterPress}
                   onRemovePress={onRemovePress}
                 />
               );
@@ -123,7 +125,7 @@ function FilterBuilderGroup(props) {
                 filterValue={filter.value}
                 filterType={filter.type}
                 filterCount={group.filters.length}
-                onAddPress={onAddFilterPress}
+                onAddPress={onAddFilterAfterPress}
                 onRemovePress={onRemovePress}
                 onFilterChange={onFilterChange}
               />
@@ -144,8 +146,9 @@ FilterBuilderGroup.propTypes = {
   filterBuilderProps: PropTypes.arrayOf(PropTypes.object).isRequired,
   onGroupChange: PropTypes.func.isRequired,
   onFilterChange: PropTypes.func.isRequired,
-  onAddFilterPress: PropTypes.func.isRequired,
-  onAddGroupPress: PropTypes.func.isRequired,
+  onAddFilterToGroupPress: PropTypes.func.isRequired,
+  onAddGroupToGroupPress: PropTypes.func.isRequired,
+  onAddFilterAfterPress: PropTypes.func.isRequired,
   onRemovePress: PropTypes.func.isRequired
 };
 

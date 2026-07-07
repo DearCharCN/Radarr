@@ -148,21 +148,22 @@ class FilterBuilderModalContent extends Component {
     });
   };
 
-  onAddFilterPress = (path) => {
-    const filterGroup = path.length ?
-      insertNodeAfterPath(this.state.filterGroup, path, {}) :
-      addChildToGroup(this.state.filterGroup, path, {});
-
+  onAddFilterToGroupPress = (path) => {
     this.setState({
-      filterGroup
+      filterGroup: addChildToGroup(this.state.filterGroup, path, {})
     });
   };
 
-  onAddGroupPress = (path) => {
-    const group = createFilterGroup('and', [{}]);
+  onAddGroupToGroupPress = (path) => {
+    this.setState({
+      filterGroup: addChildToGroup(this.state.filterGroup, path, createFilterGroup('and', [{}]))
+    });
+  };
+
+  onAddFilterAfterPress = (path) => {
     const filterGroup = path.length ?
-      insertNodeAfterPath(this.state.filterGroup, path, group) :
-      addChildToGroup(this.state.filterGroup, path, group);
+      insertNodeAfterPath(this.state.filterGroup, path, {}) :
+      addChildToGroup(this.state.filterGroup, path, {});
 
     this.setState({
       filterGroup
@@ -261,8 +262,9 @@ class FilterBuilderModalContent extends Component {
               filterBuilderProps={filterBuilderProps}
               onGroupChange={this.onGroupChange}
               onFilterChange={this.onFilterChange}
-              onAddFilterPress={this.onAddFilterPress}
-              onAddGroupPress={this.onAddGroupPress}
+              onAddFilterToGroupPress={this.onAddFilterToGroupPress}
+              onAddGroupToGroupPress={this.onAddGroupToGroupPress}
+              onAddFilterAfterPress={this.onAddFilterAfterPress}
               onRemovePress={this.onRemovePress}
             />
           </div>
