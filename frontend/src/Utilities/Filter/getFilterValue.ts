@@ -1,4 +1,8 @@
-import { Filter } from 'App/State/AppState';
+import { Filter, FilterExpression, PropertyFilter } from 'App/State/AppState';
+
+function isPropertyFilter(filter: FilterExpression): filter is PropertyFilter {
+  return 'key' in filter;
+}
 
 export default function getFilterValue<T>(
   filters: Filter[],
@@ -12,7 +16,9 @@ export default function getFilterValue<T>(
     return defaultValue;
   }
 
-  const filterValue = filter.filters.find((f) => f.key === filterValueKey);
+  const filterValue = filter.filters.find((f): f is PropertyFilter => {
+    return isPropertyFilter(f) && f.key === filterValueKey;
+  });
 
   return filterValue ? filterValue.value : defaultValue;
 }

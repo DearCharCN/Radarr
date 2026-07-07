@@ -14,3 +14,47 @@
 .rows {
   margin-bottom: 100px;
 }
+
+.rootFilterGroup {
+  min-width: 0;
+}
+
+.filterGroup {
+  margin: 8px 0 8px 18px;
+  padding-left: 12px;
+  border-left: 2px solid var(--borderColor);
+}
+
+.filterGroupHeader {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.combinatorContainer {
+  flex: 0 0 88px;
+  margin-right: 10px;
+}
+
+.groupActionsContainer {
+  display: flex;
+}
+
+.filterGroupChildren {
+  min-width: 0;
+}
+
+@media only screen and (max-width: $breakpointSmall) {
+  .filterGroup {
+    margin-left: 8px;
+    padding-left: 8px;
+  }
+
+  .filterGroupHeader {
+    align-items: flex-start;
+  }
+
+  .combinatorContainer {
+    flex: 1 1 auto;
+  }
+}

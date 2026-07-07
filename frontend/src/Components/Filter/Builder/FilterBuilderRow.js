@@ -294,7 +294,10 @@ class FilterBuilderRow extends Component {
 }
 
 FilterBuilderRow.propTypes = {
-  index: PropTypes.number.isRequired,
+  index: PropTypes.oneOfType([
+    PropTypes.number,
+    PropTypes.arrayOf(PropTypes.number)
+  ]).isRequired,
   filterKey: PropTypes.string,
   filterValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.array, PropTypes.object]),
   filterType: PropTypes.string,

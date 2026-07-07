@@ -9,9 +9,86 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes } from 'Helpers/Props';
+import { createFilterGroup, normalizeFilterGroup, serializeFilterGroup } from 'Utilities/Filter/filterTree';
 import translate from 'Utilities/String/translate';
-import FilterBuilderRow from './FilterBuilderRow';
+import FilterBuilderGroup from './FilterBuilderGroup';
 import styles from './FilterBuilderModalContent.css';
+
+function ensureGroupHasFilter(group) {
+  if (group.filters.length) {
+    return group;
+  }
+
+  return {
+    ...group,
+    filters: [{}]
+  };
+}
+
+function updateNodeAtPath(group, path, updater) {
+  if (!path.length) {
+    return updater(group);
+  }
+
+  const [index, ...childPath] = path;
+  const filters = [...group.filters];
+  const child = filters[index];
+
+  filters[index] = childPath.length ?
+    updateNodeAtPath(child, childPath, updater) :
+    updater(child);
+
+  return {
+    ...group,
+    filters
+  };
+}
+
+function addChildToGroup(group, path, child) {
+  return updateNodeAtPath(group, path, (node) => {
+    return {
+      ...node,
+      filters: [
+        ...node.filters,
+        child
+      ]
+    };
+  });
+}
+
+function insertNodeAfterPath(group, path, node) {
+  const parentPath = path.slice(0, -1);
+  const index = path[path.length - 1];
+
+  return updateNodeAtPath(group, parentPath, (parent) => {
+    const filters = [...parent.filters];
+    filters.splice(index + 1, 0, node);
+
+    return {
+      ...parent,
+      filters
+    };
+  });
+}
+
+function removeNodeAtPath(group, path) {
+  const parentPath = path.slice(0, -1);
+  const index = path[path.length - 1];
+
+  return updateNodeAtPath(group, parentPath, (parent) => {
+    if (parent.filters.length === 1) {
+      return parent;
+    }
+
+    const filters = [...parent.filters];
+    filters.splice(index, 1);
+
+    return {
+      ...parent,
+      filters
+    };
+  });
+}
 
 class FilterBuilderModalContent extends Component {
 
@@ -21,18 +98,11 @@ class FilterBuilderModalContent extends Component {
   constructor(props, context) {
     super(props, context);
 
-    const filters = [...props.filters];
-
-    // Push an empty filter if there aren't any filters. FilterBuilderRow
-    // will handle initializing the filter.
-
-    if (!filters.length) {
-      filters.push({});
-    }
+    const filterGroup = ensureGroupHasFilter(normalizeFilterGroup(props.filters));
 
     this.state = {
       label: props.label,
-      filters,
+      filterGroup,
       labelErrors: []
     };
   }
@@ -66,30 +136,42 @@ class FilterBuilderModalContent extends Component {
     this.setState({ label: value });
   };
 
-  onFilterChange = (index, filter) => {
-    const filters = [...this.state.filters];
-    filters.splice(index, 1, filter);
-
+  onGroupChange = (path, group) => {
     this.setState({
-      filters
+      filterGroup: updateNodeAtPath(this.state.filterGroup, path, () => group)
     });
   };
 
-  onAddFilterPress = () => {
-    const filters = [...this.state.filters];
-    filters.push({});
-
+  onFilterChange = (path, filter) => {
     this.setState({
-      filters
+      filterGroup: updateNodeAtPath(this.state.filterGroup, path, () => filter)
     });
   };
 
-  onRemoveFilterPress = (index) => {
-    const filters = [...this.state.filters];
-    filters.splice(index, 1);
+  onAddFilterPress = (path) => {
+    const filterGroup = path.length ?
+      insertNodeAfterPath(this.state.filterGroup, path, {}) :
+      addChildToGroup(this.state.filterGroup, path, {});
 
     this.setState({
-      filters
+      filterGroup
+    });
+  };
+
+  onAddGroupPress = (path) => {
+    const group = createFilterGroup('and', [{}]);
+    const filterGroup = path.length ?
+      insertNodeAfterPath(this.state.filterGroup, path, group) :
+      addChildToGroup(this.state.filterGroup, path, group);
+
+    this.setState({
+      filterGroup
+    });
+  };
+
+  onRemovePress = (path) => {
+    this.setState({
+      filterGroup: removeNodeAtPath(this.state.filterGroup, path)
     });
   };
 
@@ -102,7 +184,7 @@ class FilterBuilderModalContent extends Component {
 
     const {
       label,
-      filters
+      filterGroup
     } = this.state;
 
     if (!label) {
@@ -121,7 +203,7 @@ class FilterBuilderModalContent extends Component {
       id,
       type: customFilterType,
       label,
-      filters
+      filters: serializeFilterGroup(filterGroup)
     });
   };
 
@@ -140,7 +222,7 @@ class FilterBuilderModalContent extends Component {
 
     const {
       label,
-      filters,
+      filterGroup,
       labelErrors
     } = this.state;
 
@@ -170,25 +252,19 @@ class FilterBuilderModalContent extends Component {
           <div className={styles.label}>{translate('Filters')}</div>
 
           <div className={styles.rows}>
-            {
-              filters.map((filter, index) => {
-                return (
-                  <FilterBuilderRow
-                    key={`${filter.key}-${index}`}
-                    index={index}
-                    sectionItems={sectionItems}
-                    filterBuilderProps={filterBuilderProps}
-                    filterKey={filter.key}
-                    filterValue={filter.value}
-                    filterType={filter.type}
-                    filterCount={filters.length}
-                    onAddPress={this.onAddFilterPress}
-                    onRemovePress={this.onRemoveFilterPress}
-                    onFilterChange={this.onFilterChange}
-                  />
-                );
-              })
-            }
+            <FilterBuilderGroup
+              group={filterGroup}
+              path={[]}
+              isRoot={true}
+              filterCount={1}
+              sectionItems={sectionItems}
+              filterBuilderProps={filterBuilderProps}
+              onGroupChange={this.onGroupChange}
+              onFilterChange={this.onFilterChange}
+              onAddFilterPress={this.onAddFilterPress}
+              onAddGroupPress={this.onAddGroupPress}
+              onRemovePress={this.onRemovePress}
+            />
           </div>
         </ModalBody>
 

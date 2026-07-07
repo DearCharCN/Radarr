@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { createSelector } from 'reselect';
 import { filterTypePredicates, filterTypes, sortDirections } from 'Helpers/Props';
+import { FILTER_COMBINATOR_OR, isFilterGroup, normalizeFilterGroup } from 'Utilities/Filter/filterTree';
 import findSelectedFilters from 'Utilities/Filter/findSelectedFilters';
 
 function getSortClause(sortKey, sortDirection, sortPredicates) {
@@ -15,7 +16,72 @@ function getSortClause(sortKey, sortDirection, sortPredicates) {
   };
 }
 
-function filter(items, state) {
+function doesFilterMatch(item, filter, filterPredicates) {
+  const {
+    key,
+    value,
+    type = filterTypes.EQUAL
+  } = filter;
+
+  if (filterPredicates && filterPredicates.hasOwnProperty(key)) {
+    const predicate = filterPredicates[key];
+
+    if (Array.isArray(value)) {
+      if (
+        type === filterTypes.NOT_CONTAINS ||
+        type === filterTypes.NOT_EQUAL
+      ) {
+        return value.every((v) => predicate(item, v, type));
+      }
+
+      return value.some((v) => predicate(item, v, type));
+    }
+
+    return predicate(item, value, type);
+  } else if (item.hasOwnProperty(key)) {
+    const predicate = filterTypePredicates[type];
+
+    if (Array.isArray(value)) {
+      if (
+        type === filterTypes.NOT_CONTAINS ||
+        type === filterTypes.NOT_EQUAL
+      ) {
+        return value.every((v) => predicate(item[key], v));
+      }
+
+      return value.some((v) => predicate(item[key], v));
+    }
+
+    return predicate(item[key], value);
+  }
+
+  // Default to false if the filter can't be tested.
+  return false;
+}
+
+function doesFilterGroupMatch(item, group, filterPredicates) {
+  const filters = group.filters || [];
+
+  if (!filters.length) {
+    return true;
+  }
+
+  if (group.combinator === FILTER_COMBINATOR_OR) {
+    return filters.some((childFilter) => {
+      return isFilterGroup(childFilter) ?
+        doesFilterGroupMatch(item, childFilter, filterPredicates) :
+        doesFilterMatch(item, childFilter, filterPredicates);
+    });
+  }
+
+  return filters.every((childFilter) => {
+    return isFilterGroup(childFilter) ?
+      doesFilterGroupMatch(item, childFilter, filterPredicates) :
+      doesFilterMatch(item, childFilter, filterPredicates);
+  });
+}
+
+function filterItems(items, state) {
   const {
     selectedFilterKey,
     filters,
@@ -28,57 +94,10 @@ function filter(items, state) {
   }
 
   const selectedFilters = findSelectedFilters(selectedFilterKey, filters, customFilters);
+  const selectedFilterGroup = normalizeFilterGroup(selectedFilters);
 
   return _.filter(items, (item) => {
-    let i = 0;
-    let accepted = true;
-
-    while (accepted && i < selectedFilters.length) {
-      const {
-        key,
-        value,
-        type = filterTypes.EQUAL
-      } = selectedFilters[i];
-
-      if (filterPredicates && filterPredicates.hasOwnProperty(key)) {
-        const predicate = filterPredicates[key];
-
-        if (Array.isArray(value)) {
-          if (
-            type === filterTypes.NOT_CONTAINS ||
-            type === filterTypes.NOT_EQUAL
-          ) {
-            accepted = value.every((v) => predicate(item, v, type));
-          } else {
-            accepted = value.some((v) => predicate(item, v, type));
-          }
-        } else {
-          accepted = predicate(item, value, type);
-        }
-      } else if (item.hasOwnProperty(key)) {
-        const predicate = filterTypePredicates[type];
-
-        if (Array.isArray(value)) {
-          if (
-            type === filterTypes.NOT_CONTAINS ||
-            type === filterTypes.NOT_EQUAL
-          ) {
-            accepted = value.every((v) => predicate(item[key], v));
-          } else {
-            accepted = value.some((v) => predicate(item[key], v));
-          }
-        } else {
-          accepted = predicate(item[key], value);
-        }
-      } else {
-        // Default to false if the filter can't be tested
-        accepted = false;
-      }
-
-      i++;
-    }
-
-    return accepted;
+    return doesFilterGroupMatch(item, selectedFilterGroup, filterPredicates);
   });
 }
 
@@ -127,7 +146,7 @@ function createClientSideCollectionSelector(section, uiSection) {
     (sectionState, uiSectionState = {}, customFilters) => {
       const state = Object.assign({}, sectionState, uiSectionState, { customFilters });
 
-      const filtered = filter(state.items, state);
+      const filtered = filterItems(state.items, state);
       const sorted = sort(filtered, state);
 
       return {

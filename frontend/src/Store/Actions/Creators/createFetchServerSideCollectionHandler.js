@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { batchActions } from 'redux-batched-actions';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
+import { hasFilterGroups } from 'Utilities/Filter/filterTree';
 import findSelectedFilters from 'Utilities/Filter/findSelectedFilters';
 import getSectionState from 'Utilities/State/getSectionState';
 import { set, updateServerSideCollection } from '../baseActions';
@@ -36,9 +37,11 @@ function createFetchServerSideCollectionHandler(section, url, fetchDataAugmenter
 
     const selectedFilters = findSelectedFilters(selectedFilterKey, filters, customFilters);
 
-    selectedFilters.forEach((filter) => {
-      data[filter.key] = filter.value;
-    });
+    if (!hasFilterGroups(selectedFilters)) {
+      selectedFilters.forEach((filter) => {
+        data[filter.key] = filter.value;
+      });
+    }
 
     const promise = createAjaxRequest({
       url,

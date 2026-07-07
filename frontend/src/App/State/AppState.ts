@@ -45,17 +45,25 @@ export interface PropertyFilter {
   type: string;
 }
 
+export interface PropertyFilterGroup {
+  kind: 'group';
+  combinator: 'and' | 'or';
+  filters: Array<PropertyFilter | PropertyFilterGroup>;
+}
+
+export type FilterExpression = PropertyFilter | PropertyFilterGroup;
+
 export interface Filter {
   key: string;
   label: string | (() => string);
-  filters: PropertyFilter[];
+  filters: FilterExpression[];
 }
 
 export interface CustomFilter {
   id: number;
   type: string;
   label: string;
-  filters: PropertyFilter[];
+  filters: FilterExpression[];
 }
 
 export interface AppSectionState {
