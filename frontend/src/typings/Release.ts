@@ -28,6 +28,7 @@ interface Release {
   subs: string[];
   audioInfo: ReleaseAudioInfo[];
   mediaInfoStatus?: string;
+  mediaInfoHandleId?: string;
   mediaInfoSearchId?: string;
   mediaInfoProgressStatus?: string;
   mediaInfoProgressCompleted?: number;

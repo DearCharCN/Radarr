@@ -37,6 +37,7 @@ namespace Radarr.Api.V3.Indexers
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
         public string MediaInfoStatus { get; set; }
+        public string MediaInfoHandleId { get; set; }
         public string MediaInfoSearchId { get; set; }
         public string MediaInfoProgressStatus { get; set; }
         public int MediaInfoProgressCompleted { get; set; }
@@ -86,6 +87,7 @@ namespace Radarr.Api.V3.Indexers
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
         public string MediaInfoStatus { get; set; }
+        public string MediaInfoHandleId { get; set; }
         public string MediaInfoSearchId { get; set; }
         public string MediaInfoProgressStatus { get; set; }
         public int MediaInfoProgressCompleted { get; set; }
@@ -126,6 +128,7 @@ namespace Radarr.Api.V3.Indexers
                 Subs = releaseInfo.Subs,
                 AudioInfo = releaseInfo.AudioInfo,
                 MediaInfoStatus = releaseInfo.MediaInfoStatus,
+                MediaInfoHandleId = releaseInfo.MediaInfoHandleId,
                 MediaInfoSearchId = releaseInfo.MediaInfoSearchId,
                 MediaInfoProgressStatus = releaseInfo.MediaInfoProgressStatus,
                 MediaInfoProgressCompleted = releaseInfo.MediaInfoProgressCompleted,
@@ -196,6 +199,7 @@ namespace Radarr.Api.V3.Indexers
             model.Subs = resource.Subs ?? new List<string>();
             model.AudioInfo = resource.AudioInfo ?? new List<ReleaseAudioInfo>();
             model.MediaInfoStatus = resource.MediaInfoStatus;
+            model.MediaInfoHandleId = resource.MediaInfoHandleId;
             model.MediaInfoSearchId = resource.MediaInfoSearchId;
             model.MediaInfoProgressStatus = resource.MediaInfoProgressStatus;
             model.MediaInfoProgressCompleted = resource.MediaInfoProgressCompleted;

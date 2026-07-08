@@ -26,7 +26,9 @@ namespace NzbDrone.Core.IndexerSearch
 
     public class ReleaseSearchService : ISearchForReleases
     {
+        private const int MediaInfoWindowSize = 4;
         private static readonly TimeSpan MediaInfoWaitTimeout = TimeSpan.FromSeconds(120);
+        private static readonly TimeSpan MediaInfoPollInterval = TimeSpan.FromSeconds(5);
 
         private readonly IIndexerFactory _indexerFactory;
         private readonly IHttpClient _httpClient;
@@ -177,11 +179,17 @@ namespace NzbDrone.Core.IndexerSearch
                 {
                     reports = await fetchReports();
                 }
+
+                if (HasPendingMediaInfo(reports))
+                {
+                    await Task.Delay(MediaInfoPollInterval);
+                }
             }
 
             if (HasPendingMediaInfo(reports))
             {
                 _logger.Warn("Timed out waiting for additional media data for {0}; continuing with the latest available search results", criteriaBase);
+                CancelPendingMediaInfo(reports);
             }
 
             return reports;
@@ -190,9 +198,21 @@ namespace NzbDrone.Core.IndexerSearch
         private bool EnrichPendingMediaInfo(List<ReleaseInfo> reports)
         {
             var enrichedAny = false;
+            var activeHandles = reports.Count(x => x.MediaInfoStatus == "pending" && x.MediaInfoHandleId.IsNotNullOrWhiteSpace());
+            var skippedForWindow = 0;
+            var pendingReports = reports.Count(x => x.MediaInfoStatus == "pending");
+            _logger.Debug("Radarr automatic mediaInfo enrichment pass: pending {0}, active handles {1}/{2}", pendingReports, activeHandles, MediaInfoWindowSize);
 
             foreach (var report in reports.Where(x => x.MediaInfoStatus == "pending").ToList())
             {
+                var hadActiveHandle = report.MediaInfoHandleId.IsNotNullOrWhiteSpace();
+
+                if (!hadActiveHandle && activeHandles >= MediaInfoWindowSize)
+                {
+                    skippedForWindow++;
+                    continue;
+                }
+
                 if (report.ProwlarrIndexerId <= 0)
                 {
                     report.MediaInfoStatus = "unavailable";
@@ -210,6 +230,15 @@ namespace NzbDrone.Core.IndexerSearch
                     continue;
                 }
 
+                _logger.Debug("Radarr automatic mediaInfo Prowlarr request starting: release {0}, indexer {1}, prowlarr indexer {2}, existing handle {3}, active handles {4}/{5}, search {6}",
+                    report.Guid,
+                    report.IndexerId,
+                    report.ProwlarrIndexerId,
+                    report.MediaInfoHandleId,
+                    activeHandles,
+                    MediaInfoWindowSize,
+                    report.MediaInfoSearchId);
+
                 var request = new HttpRequestBuilder(BuildProwlarrMediaInfoUrl(settings))
                     .Post()
                     .Build();
@@ -219,9 +248,10 @@ namespace NzbDrone.Core.IndexerSearch
                 {
                     report.Guid,
                     IndexerId = report.ProwlarrIndexerId,
+                    report.MediaInfoHandleId,
                     report.MediaInfoSearchId
                 }.ToJson());
-                request.ContentSummary = $"{{ \"guid\": \"{report.Guid}\", \"indexerId\": {report.ProwlarrIndexerId}, \"mediaInfoSearchId\": \"{report.MediaInfoSearchId}\" }}";
+                request.ContentSummary = $"{{ \"guid\": \"{report.Guid}\", \"indexerId\": {report.ProwlarrIndexerId}, \"mediaInfoHandleId\": \"{report.MediaInfoHandleId}\", \"mediaInfoSearchId\": \"{report.MediaInfoSearchId}\" }}";
                 request.SuppressHttpError = true;
 
                 if (settings.ApiKey.IsNotNullOrWhiteSpace())
@@ -242,14 +272,75 @@ namespace NzbDrone.Core.IndexerSearch
                 report.Subs = response.Resource.Subs ?? report.Subs;
                 report.AudioInfo = response.Resource.AudioInfo ?? report.AudioInfo;
                 report.MediaInfoStatus = response.Resource.MediaInfoStatus;
+                report.MediaInfoHandleId = response.Resource.MediaInfoStatus == "pending" ? response.Resource.MediaInfoHandleId : null;
                 report.MediaInfoSearchId = response.Resource.MediaInfoSearchId;
                 report.MediaInfoProgressStatus = response.Resource.MediaInfoProgressStatus;
                 report.MediaInfoProgressCompleted = response.Resource.MediaInfoProgressCompleted;
                 report.MediaInfoProgressTotal = response.Resource.MediaInfoProgressTotal;
                 enrichedAny = true;
+                _logger.Debug("Radarr automatic mediaInfo Prowlarr request completed: release {0}, status {1}, handle {2}, progress {3}/{4} {5}",
+                    report.Guid,
+                    report.MediaInfoStatus,
+                    report.MediaInfoHandleId,
+                    report.MediaInfoProgressCompleted,
+                    report.MediaInfoProgressTotal,
+                    report.MediaInfoProgressStatus);
+
+                if (report.MediaInfoStatus == "pending" && report.MediaInfoHandleId.IsNotNullOrWhiteSpace() && !hadActiveHandle)
+                {
+                    activeHandles++;
+                }
+                else if (report.MediaInfoStatus != "pending" && hadActiveHandle)
+                {
+                    activeHandles = Math.Max(0, activeHandles - 1);
+                }
+            }
+
+            if (skippedForWindow > 0)
+            {
+                _logger.Debug("Radarr automatic mediaInfo enrichment skipped {0} pending releases because the active handle window is full", skippedForWindow);
             }
 
             return enrichedAny;
+        }
+
+        private void CancelPendingMediaInfo(List<ReleaseInfo> reports)
+        {
+            foreach (var report in reports.Where(x => x.MediaInfoStatus == "pending" && x.MediaInfoHandleId.IsNotNullOrWhiteSpace()))
+            {
+                _logger.Debug("Radarr automatic mediaInfo cancel requested: release {0}, indexer {1}, handle {2}",
+                    report.Guid,
+                    report.IndexerId,
+                    report.MediaInfoHandleId);
+
+                var indexer = _indexerFactory.Get(report.IndexerId);
+                var settings = indexer?.Settings as NewznabSettings;
+
+                if (settings == null)
+                {
+                    continue;
+                }
+
+                var request = new HttpRequestBuilder(BuildProwlarrMediaInfoCancelUrl(settings))
+                    .Post()
+                    .Build();
+
+                request.Headers.ContentType = "application/json";
+                request.SetContent(new
+                {
+                    report.MediaInfoHandleId
+                }.ToJson());
+                request.ContentSummary = $"{{ \"mediaInfoHandleId\": \"{report.MediaInfoHandleId}\" }}";
+                request.SuppressHttpError = true;
+
+                if (settings.ApiKey.IsNotNullOrWhiteSpace())
+                {
+                    request.Headers.Set("X-Api-Key", settings.ApiKey);
+                }
+
+                _httpClient.Post(request);
+                report.MediaInfoHandleId = null;
+            }
         }
 
         private static bool HasPendingMediaInfo(List<ReleaseInfo> reports)
@@ -258,6 +349,16 @@ namespace NzbDrone.Core.IndexerSearch
         }
 
         private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings)
+        {
+            return BuildProwlarrMediaInfoUrl(settings, false);
+        }
+
+        private static string BuildProwlarrMediaInfoCancelUrl(NewznabSettings settings)
+        {
+            return BuildProwlarrMediaInfoUrl(settings, true);
+        }
+
+        private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings, bool cancel)
         {
             var baseUrl = settings.BaseUrl.TrimEnd('/');
             var apiPath = settings.ApiPath.IsNullOrWhiteSpace() ? "/api" : settings.ApiPath;
@@ -282,6 +383,11 @@ namespace NzbDrone.Core.IndexerSearch
             segments.Add("search");
             segments.Add("mediaInfo");
 
+            if (cancel)
+            {
+                segments.Add("cancel");
+            }
+
             uriBuilder.Path = string.Join("/", segments);
             uriBuilder.Query = string.Empty;
 
@@ -293,6 +399,7 @@ namespace NzbDrone.Core.IndexerSearch
             public List<string> Subs { get; set; }
             public List<ReleaseAudioInfo> AudioInfo { get; set; }
             public string MediaInfoStatus { get; set; }
+            public string MediaInfoHandleId { get; set; }
             public string MediaInfoSearchId { get; set; }
             public string MediaInfoProgressStatus { get; set; }
             public int MediaInfoProgressCompleted { get; set; }

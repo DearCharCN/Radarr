@@ -18,10 +18,18 @@ export const section = 'releases';
 
 let abortCurrentRequest = null;
 let mediaInfoAbortRequests = [];
+let mediaInfoActiveHandles = [];
 let mediaInfoSearchId = 0;
 
-const mediaInfoConcurrency = 4;
+const mediaInfoWindowSize = 4;
+const mediaInfoRetryDelay = 5000;
 const mediaInfoSortKeys = ['audioInfo', 'subs'];
+
+function logMediaInfoDebug(message, data = {}) {
+  if (typeof console !== 'undefined' && console.info) {
+    console.info('[Radarr MediaInfo]', message, data);
+  }
+}
 
 //
 // State
@@ -385,9 +393,26 @@ function snapshotMediaInfoSortValues(items, sortKey) {
 }
 
 function getMediaInfoProgress(releases = []) {
-  const progressRelease = releases.find((release) => {
-    return release.mediaInfoProgressStatus;
-  });
+  const progressRelease = releases.reduce((best, release) => {
+    if (!release.mediaInfoProgressStatus) {
+      return best;
+    }
+
+    if (!best) {
+      return release;
+    }
+
+    const completed = release.mediaInfoProgressCompleted || 0;
+    const bestCompleted = best.mediaInfoProgressCompleted || 0;
+    const total = release.mediaInfoProgressTotal || 0;
+    const bestTotal = best.mediaInfoProgressTotal || 0;
+
+    if (completed !== bestCompleted) {
+      return completed > bestCompleted ? release : best;
+    }
+
+    return total >= bestTotal ? release : best;
+  }, null);
 
   if (progressRelease) {
     const total = progressRelease.mediaInfoProgressTotal || 0;
@@ -404,12 +429,24 @@ function getMediaInfoProgress(releases = []) {
   const pendingCount = releases.filter((release) => {
     return release.mediaInfoStatus === 'pending';
   }).length;
+  const hasMediaInfoState = releases.some((release) => {
+    return release.mediaInfoStatus || release.mediaInfoProgressStatus;
+  });
+
+  if (!hasMediaInfoState) {
+    return {
+      isMediaInfoFetching: false,
+      isMediaInfoComplete: false,
+      mediaInfoTotal: 0,
+      mediaInfoCompleted: 0
+    };
+  }
 
   return {
     isMediaInfoFetching: pendingCount > 0,
     isMediaInfoComplete: pendingCount === 0,
-    mediaInfoTotal: pendingCount,
-    mediaInfoCompleted: 0
+    mediaInfoTotal: releases.length,
+    mediaInfoCompleted: releases.length - pendingCount
   };
 }
 
@@ -442,15 +479,57 @@ function mergeReleaseMediaInfo(releases, payload) {
 
 function clearMediaInfoPolling() {
   mediaInfoSearchId++;
+  logMediaInfoDebug('Cancelling active mediaInfo polling', {
+    searchId: mediaInfoSearchId,
+    activeHandles: mediaInfoActiveHandles.length,
+    inflightRequests: mediaInfoAbortRequests.length
+  });
 
   mediaInfoAbortRequests.forEach((abortRequest) => abortRequest());
   mediaInfoAbortRequests = [];
+
+  mediaInfoActiveHandles.forEach((handle) => {
+    logMediaInfoDebug('Sending cancel for active handle', handle);
+    createAjaxRequest({
+      url: '/release/mediaInfo/cancel',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(handle)
+    });
+  });
+
+  mediaInfoActiveHandles = [];
 }
 
 function removeMediaInfoAbortRequest(abortRequest) {
   mediaInfoAbortRequests = mediaInfoAbortRequests.filter((request) => {
     return request !== abortRequest;
   });
+}
+
+function addMediaInfoActiveHandle(handle) {
+  if (handle.mediaInfoHandleId && !mediaInfoActiveHandles.some((activeHandle) => {
+    return activeHandle.mediaInfoHandleId === handle.mediaInfoHandleId;
+  })) {
+    mediaInfoActiveHandles.push(handle);
+    logMediaInfoDebug('Tracking active handle', {
+      ...handle,
+      activeHandles: mediaInfoActiveHandles.length
+    });
+  }
+}
+
+function removeMediaInfoActiveHandle(handleId) {
+  mediaInfoActiveHandles = mediaInfoActiveHandles.filter((activeHandle) => {
+    return activeHandle.mediaInfoHandleId !== handleId;
+  });
+
+  if (handleId) {
+    logMediaInfoDebug('Stopped tracking active handle', {
+      handleId,
+      activeHandles: mediaInfoActiveHandles.length
+    });
+  }
 }
 
 function fetchReleaseMediaInfo(releases, dispatch, getState) {
@@ -468,77 +547,172 @@ function fetchReleaseMediaInfo(releases, dispatch, getState) {
   }
 
   const searchId = mediaInfoSearchId;
-  const queue = [...pendingReleases];
-  let activeRequests = 0;
+  const queue = pendingReleases.map((release) => {
+    return {
+      guid: release.guid,
+      indexerId: release.indexerId,
+      prowlarrIndexerId: release.prowlarrIndexerId,
+      mediaInfoHandleId: release.mediaInfoHandleId,
+      mediaInfoSearchId: release.mediaInfoSearchId
+    };
+  });
+  const activeItems = [];
+  logMediaInfoDebug('Starting windowed mediaInfo polling', {
+    searchId,
+    pending: queue.length,
+    windowSize: mediaInfoWindowSize
+  });
+
+  function removeActiveItem(item) {
+    const index = activeItems.indexOf(item);
+
+    if (index >= 0) {
+      activeItems.splice(index, 1);
+    }
+  }
 
   function startNext() {
     if (searchId !== mediaInfoSearchId) {
       return;
     }
 
-    while (activeRequests < mediaInfoConcurrency && queue.length) {
-      const {
-        guid,
-        indexerId,
-        prowlarrIndexerId,
-        mediaInfoSearchId: releaseMediaInfoSearchId
-      } = queue.shift();
-
-      activeRequests++;
-
-      const {
-        request,
-        abortRequest
-      } = createAjaxRequest({
-        url: '/release/mediaInfo',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ guid, indexerId, prowlarrIndexerId, mediaInfoSearchId: releaseMediaInfoSearchId })
+    while (activeItems.length < mediaInfoWindowSize && queue.length) {
+      const item = queue.shift();
+      activeItems.push(item);
+      logMediaInfoDebug('Activating queued mediaInfo row', {
+        searchId,
+        guid: item.guid,
+        indexerId: item.indexerId,
+        prowlarrIndexerId: item.prowlarrIndexerId,
+        existingHandle: item.mediaInfoHandleId,
+        active: activeItems.length,
+        queued: queue.length
       });
+      pollItem(item);
+    }
+  }
 
-      mediaInfoAbortRequests.push(abortRequest);
+  function pollItem(item) {
+    if (searchId !== mediaInfoSearchId) {
+      return;
+    }
 
-      request.done((data) => {
-        if (searchId === mediaInfoSearchId) {
-          const releaseState = getSectionState(getState(), section);
-          const updatedReleases = mergeReleaseMediaInfo(releaseState.items, data);
+    const {
+      guid,
+      indexerId,
+      prowlarrIndexerId,
+      mediaInfoHandleId,
+      mediaInfoSearchId: releaseMediaInfoSearchId
+    } = item;
+    logMediaInfoDebug('Requesting/renewing mediaInfo task', {
+      searchId,
+      guid,
+      indexerId,
+      prowlarrIndexerId,
+      existingHandle: mediaInfoHandleId,
+      releaseMediaInfoSearchId
+    });
 
-          dispatch(batchActions([
-            update({ section, data: updatedReleases }),
-            set({
-              section,
-              ...getMediaInfoProgress(updatedReleases)
-            })
-          ]));
-        }
-      });
+    const {
+      request,
+      abortRequest
+    } = createAjaxRequest({
+      url: '/release/mediaInfo',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ guid, indexerId, prowlarrIndexerId, mediaInfoHandleId, mediaInfoSearchId: releaseMediaInfoSearchId })
+    });
 
-      request.fail((xhr) => {
-        if (searchId === mediaInfoSearchId && !xhr.aborted) {
-          const releaseState = getSectionState(getState(), section);
-          const updatedReleases = mergeReleaseMediaInfo(releaseState.items, {
-            guid,
+    mediaInfoAbortRequests.push(abortRequest);
+
+    request.done((data) => {
+      if (searchId === mediaInfoSearchId) {
+        if (data.mediaInfoHandleId) {
+          item.mediaInfoHandleId = data.mediaInfoHandleId;
+          addMediaInfoActiveHandle({
             indexerId,
-            mediaInfoStatus: 'failed'
+            prowlarrIndexerId,
+            mediaInfoHandleId: data.mediaInfoHandleId
+          });
+        }
+
+        logMediaInfoDebug('mediaInfo response received', {
+          searchId,
+          guid,
+          indexerId,
+          prowlarrIndexerId,
+          status: data.mediaInfoStatus,
+          handleId: data.mediaInfoHandleId,
+          progress: `${data.mediaInfoProgressCompleted}/${data.mediaInfoProgressTotal}`,
+          progressStatus: data.mediaInfoProgressStatus
+        });
+
+        const releaseState = getSectionState(getState(), section);
+        const updatedReleases = mergeReleaseMediaInfo(releaseState.items, data);
+
+        dispatch(batchActions([
+          update({ section, data: updatedReleases }),
+          set({
+            section,
+            ...getMediaInfoProgress(updatedReleases)
+          })
+        ]));
+
+        if (data.mediaInfoStatus === 'pending') {
+          logMediaInfoDebug('mediaInfo still pending; scheduling next poll', {
+            searchId,
+            guid,
+            handleId: item.mediaInfoHandleId,
+            retryDelay: mediaInfoRetryDelay
           });
 
-          dispatch(batchActions([
-            update({ section, data: updatedReleases }),
-            set({
-              section,
-              ...getMediaInfoProgress(updatedReleases)
-            })
-          ]));
+          setTimeout(() => {
+            pollItem(item);
+          }, mediaInfoRetryDelay);
+        } else {
+          removeMediaInfoActiveHandle(item.mediaInfoHandleId);
+          removeActiveItem(item);
+          startNext();
         }
-      });
+      }
+    });
 
-      request.always(() => {
-        activeRequests--;
-        removeMediaInfoAbortRequest(abortRequest);
+    request.fail((xhr) => {
+      if (searchId === mediaInfoSearchId && !xhr.aborted) {
+        logMediaInfoDebug('mediaInfo request failed', {
+          searchId,
+          guid,
+          indexerId,
+          prowlarrIndexerId,
+          handleId: item.mediaInfoHandleId,
+          status: xhr.status
+        });
+
+        removeMediaInfoActiveHandle(item.mediaInfoHandleId);
+        removeActiveItem(item);
+
+        const releaseState = getSectionState(getState(), section);
+        const updatedReleases = mergeReleaseMediaInfo(releaseState.items, {
+          guid,
+          indexerId,
+          mediaInfoStatus: 'failed'
+        });
+
+        dispatch(batchActions([
+          update({ section, data: updatedReleases }),
+          set({
+            section,
+            ...getMediaInfoProgress(updatedReleases)
+          })
+        ]));
 
         startNext();
-      });
-    }
+      }
+    });
+
+    request.always(() => {
+      removeMediaInfoAbortRequest(abortRequest);
+    });
   }
 
   startNext();

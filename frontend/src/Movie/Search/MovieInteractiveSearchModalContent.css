@@ -1,0 +1,13 @@
+.modalFooter {
+  composes: modalFooter from '~Components/Modal/ModalFooter.css';
+
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.mediaInfoProgress {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--defaultColor);
+  font-size: 13px;
+}

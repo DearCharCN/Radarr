@@ -21,6 +21,7 @@ using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Validation;
 using Radarr.Http;
+using Radarr.Http.Extensions;
 using HttpStatusCode = System.Net.HttpStatusCode;
 
 namespace Radarr.Api.V3.Indexers
@@ -171,14 +172,24 @@ namespace Radarr.Api.V3.Indexers
                 throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Release mediaInfo is missing the Prowlarr indexer id");
             }
 
+            _logger.Debug("Radarr mediaInfo proxy request starting: remoteIp {0}, host {1}, release {2}, indexer {3}, prowlarr indexer {4}, existing handle {5}, search {6}",
+                Request.GetRemoteIP(),
+                Request.Host.Value,
+                release.Guid,
+                release.IndexerId,
+                prowlarrIndexerId,
+                release.MediaInfoHandleId,
+                release.MediaInfoSearchId);
+
             request.Headers.ContentType = "application/json";
             request.SetContent(new
             {
                 release.Guid,
                 IndexerId = prowlarrIndexerId,
+                release.MediaInfoHandleId,
                 release.MediaInfoSearchId
             }.ToJson());
-            request.ContentSummary = $"{{ \"guid\": \"{release.Guid}\", \"indexerId\": {prowlarrIndexerId}, \"mediaInfoSearchId\": \"{release.MediaInfoSearchId}\" }}";
+            request.ContentSummary = $"{{ \"guid\": \"{release.Guid}\", \"indexerId\": {prowlarrIndexerId}, \"mediaInfoHandleId\": \"{release.MediaInfoHandleId}\", \"mediaInfoSearchId\": \"{release.MediaInfoSearchId}\" }}";
             request.SuppressHttpError = true;
 
             if (settings.ApiKey.IsNotNullOrWhiteSpace())
@@ -205,11 +216,21 @@ namespace Radarr.Api.V3.Indexers
             remoteMovie.Release.Subs = result.Subs ?? remoteMovie.Release.Subs;
             remoteMovie.Release.AudioInfo = result.AudioInfo ?? remoteMovie.Release.AudioInfo;
             remoteMovie.Release.MediaInfoStatus = result.MediaInfoStatus;
+            remoteMovie.Release.MediaInfoHandleId = result.MediaInfoStatus == "pending" ? result.MediaInfoHandleId : null;
             remoteMovie.Release.MediaInfoSearchId = result.MediaInfoSearchId;
             remoteMovie.Release.MediaInfoProgressStatus = result.MediaInfoProgressStatus;
             remoteMovie.Release.MediaInfoProgressCompleted = result.MediaInfoProgressCompleted;
             remoteMovie.Release.MediaInfoProgressTotal = result.MediaInfoProgressTotal;
             remoteMovie.Release.ProwlarrIndexerId = prowlarrIndexerId;
+            _logger.Debug("Radarr mediaInfo proxy request completed: release {0}, indexer {1}, prowlarr indexer {2}, status {3}, handle {4}, progress {5}/{6} {7}",
+                release.Guid,
+                release.IndexerId,
+                prowlarrIndexerId,
+                result.MediaInfoStatus,
+                result.MediaInfoHandleId,
+                result.MediaInfoProgressCompleted,
+                result.MediaInfoProgressTotal,
+                result.MediaInfoProgressStatus);
 
             _remoteMovieCache.Set(GetCacheKey(release.IndexerId, release.Guid), remoteMovie, TimeSpan.FromMinutes(30));
 
@@ -217,6 +238,54 @@ namespace Radarr.Api.V3.Indexers
             result.ProwlarrIndexerId = prowlarrIndexerId;
 
             return Ok(result);
+        }
+
+        [HttpPost("mediaInfo/cancel")]
+        [Consumes("application/json")]
+        [Produces("application/json")]
+        public IActionResult CancelReleaseMediaInfo([FromBody] ReleaseMediaInfoResource release)
+        {
+            if (release == null || release.IndexerId <= 0 || release.MediaInfoHandleId.IsNullOrWhiteSpace())
+            {
+                return Ok();
+            }
+
+            _logger.Debug("Radarr mediaInfo cancel requested: remoteIp {0}, host {1}, release {2}, indexer {3}, prowlarr indexer {4}, handle {5}",
+                Request.GetRemoteIP(),
+                Request.Host.Value,
+                release.Guid,
+                release.IndexerId,
+                release.ProwlarrIndexerId,
+                release.MediaInfoHandleId);
+
+            var indexer = _indexerFactory.Get(release.IndexerId);
+            var settings = indexer?.Settings as NewznabSettings;
+
+            if (settings == null)
+            {
+                return Ok();
+            }
+
+            var request = new HttpRequestBuilder(BuildProwlarrMediaInfoCancelUrl(settings))
+                .Post()
+                .Build();
+
+            request.Headers.ContentType = "application/json";
+            request.SetContent(new
+            {
+                release.MediaInfoHandleId
+            }.ToJson());
+            request.ContentSummary = $"{{ \"mediaInfoHandleId\": \"{release.MediaInfoHandleId}\" }}";
+            request.SuppressHttpError = true;
+
+            if (settings.ApiKey.IsNotNullOrWhiteSpace())
+            {
+                request.Headers.Set("X-Api-Key", settings.ApiKey);
+            }
+
+            _httpClient.Post(request);
+
+            return Ok();
         }
 
         [HttpGet]
@@ -280,6 +349,16 @@ namespace Radarr.Api.V3.Indexers
 
         private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings)
         {
+            return BuildProwlarrMediaInfoUrl(settings, false);
+        }
+
+        private static string BuildProwlarrMediaInfoCancelUrl(NewznabSettings settings)
+        {
+            return BuildProwlarrMediaInfoUrl(settings, true);
+        }
+
+        private static string BuildProwlarrMediaInfoUrl(NewznabSettings settings, bool cancel)
+        {
             var baseUrl = settings.BaseUrl.TrimEnd('/');
             var apiPath = settings.ApiPath.IsNullOrWhiteSpace() ? "/api" : settings.ApiPath;
             var combinedUrl = $"{baseUrl}/{apiPath.TrimStart('/')}";
@@ -302,6 +381,11 @@ namespace Radarr.Api.V3.Indexers
             segments.Add("v1");
             segments.Add("search");
             segments.Add("mediaInfo");
+
+            if (cancel)
+            {
+                segments.Add("cancel");
+            }
 
             uriBuilder.Path = string.Join("/", segments);
             uriBuilder.Query = string.Empty;

@@ -42,6 +42,7 @@ namespace NzbDrone.Core.Parser.Model
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
         public string MediaInfoStatus { get; set; }
+        public string MediaInfoHandleId { get; set; }
         public string MediaInfoSearchId { get; set; }
         public string MediaInfoProgressStatus { get; set; }
         public int MediaInfoProgressCompleted { get; set; }
