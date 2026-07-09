@@ -18,6 +18,7 @@ namespace Radarr.Api.V3.Indexers
         public string Guid { get; set; }
         public QualityModel Quality { get; set; }
         public List<CustomFormatResource> CustomFormats { get; set; }
+        public List<CustomFormatResource> ScoredCustomFormats { get; set; }
         public int CustomFormatScore { get; set; }
         public int QualityWeight { get; set; }
         public int Age { get; set; }
@@ -122,6 +123,7 @@ namespace Radarr.Api.V3.Indexers
             var torrentInfo = (model.RemoteMovie.Release as TorrentInfo) ?? new TorrentInfo();
             var indexerFlags = torrentInfo.IndexerFlags.ToString().Split(new[] { ", " }, StringSplitOptions.None).Where(x => x != "0");
             var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie);
+            var scoredCustomFormats = remoteMovie.Movie?.QualityProfile?.GetScoredCustomFormats(remoteMovie.CustomFormats) ?? remoteMovie.CustomFormats;
 
             // TODO: Clean this mess up. don't mix data from multiple classes, use sub-resources instead? (Got a huge Deja Vu, didn't we talk about this already once?)
             return new ReleaseResource
@@ -129,6 +131,7 @@ namespace Radarr.Api.V3.Indexers
                 Guid = releaseInfo.Guid,
                 Quality = parsedMovieInfo.Quality,
                 CustomFormats = remoteMovie.CustomFormats.ToResource(false),
+                ScoredCustomFormats = scoredCustomFormats.ToResource(false),
                 CustomFormatScore = remoteMovie.CustomFormatScore,
 
                 // QualityWeight

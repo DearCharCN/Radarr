@@ -44,7 +44,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 var message = $"{size.SizeSuffix()} is too big, maximum size is {maximumSize.SizeSuffix()} (Settings->Indexers->Maximum Size)";
 
                 _logger.Debug(message);
-                return DownloadSpecDecision.Reject(DownloadRejectionReason.MaximumSizeExceeded, message);
+                return DownloadSpecDecision.Reject(DownloadRejectionReason.MaximumSizeExceeded, "{0} is too big, maximum size is {1} (Settings->Indexers->Maximum Size)", size.SizeSuffix(), maximumSize.SizeSuffix());
             }
 
             return DownloadSpecDecision.Accept();

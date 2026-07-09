@@ -97,36 +97,57 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public int CalculateCustomFormatScore(List<CustomFormat> formats)
         {
+            return GetScoredFormatItems(formats).Sum(item => item.Score);
+        }
+
+        public List<CustomFormat> GetScoredCustomFormats(List<CustomFormat> formats)
+        {
+            if (formats == null || !formats.Any())
+            {
+                return new List<CustomFormat>();
+            }
+
+            var scoredFormatIds = GetScoredFormatItems(formats)
+                .Select(item => item.Format.Id)
+                .ToHashSet();
+
+            return formats.Where(format => scoredFormatIds.Contains(format.Id)).ToList();
+        }
+
+        private List<ProfileFormatItem> GetScoredFormatItems(List<CustomFormat> formats)
+        {
             var matchedFormatIds = formats?.Select(format => format.Id).ToHashSet() ?? new HashSet<int>();
             var activeGroups = CustomFormatMutexGroups?.Where(group => group.Enabled).ToList() ?? new List<CustomFormatMutexGroup>();
             var formatItems = FormatItems ?? new List<ProfileFormatItem>();
 
             if (!activeGroups.Any())
             {
-                return formatItems.Where(x => matchedFormatIds.Contains(x.Format.Id)).Sum(x => x.Score);
+                return formatItems.Where(item => matchedFormatIds.Contains(item.Format.Id)).ToList();
             }
 
             var groupedFormatIds = activeGroups
                 .SelectMany(group => group.CustomFormatIds ?? new List<int>())
                 .ToHashSet();
 
-            var score = formatItems
+            var scoredFormatItems = formatItems
                 .Where(item => matchedFormatIds.Contains(item.Format.Id) && !groupedFormatIds.Contains(item.Format.Id))
-                .Sum(item => item.Score);
+                .ToList();
 
             foreach (var group in activeGroups)
             {
                 var groupFormatIds = group.CustomFormatIds?.ToHashSet() ?? new HashSet<int>();
-                var groupScore = formatItems
+                var groupItems = formatItems
                     .Where(item => matchedFormatIds.Contains(item.Format.Id) && groupFormatIds.Contains(item.Format.Id))
-                    .Select(item => item.Score)
-                    .DefaultIfEmpty()
-                    .Max();
+                    .ToList();
 
-                score += groupScore;
+                if (groupItems.Any())
+                {
+                    var groupScore = groupItems.Max(item => item.Score);
+                    scoredFormatItems.Add(groupItems.First(item => item.Score == groupScore));
+                }
             }
 
-            return score;
+            return scoredFormatItems;
         }
     }
 }

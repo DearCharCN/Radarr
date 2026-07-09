@@ -60,7 +60,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 var message = "Importing after download will exceed available disk space";
 
                 _logger.Debug(message);
-                return DownloadSpecDecision.Reject(DownloadRejectionReason.MinimumFreeSpace, message);
+                return DownloadSpecDecision.RejectWithKey(DownloadRejectionReason.MinimumFreeSpace, "DownloadRejectionMinimumFreeSpaceExceeded", message);
             }
 
             if (remainingSpace < minimumSpace)
@@ -68,7 +68,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 var message = $"Not enough free space ({minimumSpace.SizeSuffix()}) to import after download: {remainingSpace.SizeSuffix()}. (Settings: Media Management: Minimum Free Space)";
 
                 _logger.Debug(message);
-                return DownloadSpecDecision.Reject(DownloadRejectionReason.MinimumFreeSpace, message);
+                return DownloadSpecDecision.Reject(DownloadRejectionReason.MinimumFreeSpace, "Not enough free space ({0}) to import after download: {1}. (Settings: Media Management: Minimum Free Space)", minimumSpace.SizeSuffix(), remainingSpace.SizeSuffix());
             }
 
             return DownloadSpecDecision.Accept();

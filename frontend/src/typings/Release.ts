@@ -46,6 +46,7 @@ interface Release {
   mediaInfoProgressCompleted?: number;
   mediaInfoProgressTotal?: number;
   customFormats: CustomFormat[];
+  scoredCustomFormats?: CustomFormat[];
   customFormatScore: number;
   mappedMovieId?: number;
   indexerFlags: string[];

@@ -32,7 +32,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
             var status = _blockedIndexerCache.Find(subject.Release.IndexerId.ToString());
             if (status != null)
             {
-                return DownloadSpecDecision.Reject(DownloadRejectionReason.IndexerDisabled, $"Indexer {subject.Release.Indexer} is blocked till {status.DisabledTill} due to failures, cannot grab release.");
+                return DownloadSpecDecision.Reject(DownloadRejectionReason.IndexerDisabled, "Indexer {0} is blocked till {1} due to failures, cannot grab release.", subject.Release.Indexer, status.DisabledTill);
             }
 
             return DownloadSpecDecision.Accept();

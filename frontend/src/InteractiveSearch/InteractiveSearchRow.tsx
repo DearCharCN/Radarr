@@ -156,6 +156,17 @@ function getAudioTrackTagKind(tag: string): AudioTrackTagKind {
   return 'language';
 }
 
+function getAudioTrackTagOrder(kind: AudioTrackTagKind) {
+  const order = {
+    selected: 0,
+    origin: 1,
+    chinese: 2,
+    language: 2,
+  };
+
+  return order[kind];
+}
+
 function getAudioTrackTags(
   audioInfo: ReleaseAudioInfo,
   isSelected: boolean,
@@ -168,19 +179,29 @@ function getAudioTrackTags(
           : audioInfo.languageTags || []),
       ]
     : audioInfo.languageTags || [];
+  const sourceTagItems = sourceTags
+    .map((tag) => tag?.trim())
+    .filter((tag): tag is string => Boolean(tag))
+    .map((tag, index) => {
+      return {
+        index,
+        label: tag,
+        kind: getAudioTrackTagKind(tag),
+      };
+    })
+    .sort((a, b) => {
+      const orderDiff =
+        getAudioTrackTagOrder(a.kind) - getAudioTrackTagOrder(b.kind);
+
+      return orderDiff || a.index - b.index;
+    });
   const tags: AudioTrackTag[] = [
     ...(isSelected
       ? [{ label: translate('Selected'), kind: 'selected' as const }]
       : []),
-    ...sourceTags
-      .map((tag) => tag?.trim())
-      .filter((tag): tag is string => Boolean(tag))
-      .map((tag) => {
-        return {
-          label: tag,
-          kind: getAudioTrackTagKind(tag),
-        };
-      }),
+    ...sourceTagItems.map(({ label, kind }) => {
+      return { label, kind };
+    }),
   ];
   const seen = new Set<string>();
 
@@ -206,6 +227,18 @@ function getAudioTrackTagClass(kind: AudioTrackTagKind) {
   }[kind];
 
   return `${styles.audioTrackTag} ${kindClass}`;
+}
+
+function getAudioScoreKind(score: number) {
+  if (score > 0) {
+    return kinds.SUCCESS;
+  }
+
+  if (score < 0) {
+    return kinds.DANGER;
+  }
+
+  return kinds.DEFAULT;
 }
 
 interface AudioTrackDetailProps {
@@ -306,6 +339,7 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
     mediaInfoStatus,
     customFormatScore,
     customFormats,
+    scoredCustomFormats,
     mappedMovieId,
     indexerFlags = [],
     rejections = [],
@@ -336,6 +370,9 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
   const selectedAudioLabel = selectedAudioInfo
     ? formatAudioInfo(selectedAudioInfo, selectedAudioLanguage)
     : '';
+  const selectedAudioSummaryLabel = selectedAudioInfo
+    ? getAudioLanguage(selectedAudioInfo, selectedAudioLanguage)
+    : '';
   const audioTrackDetails = audioInfo.map((audio, index) => {
     return {
       key: `${index}-${formatAudioInfo(audio)}`,
@@ -364,6 +401,15 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
         ]
       : audioTrackDetails;
   const audioScoreLabel = audioScore > 0 ? `+${audioScore}` : `${audioScore}`;
+  const audioSummaryLabel =
+    selectedAudioSummaryLabel || audioLabel || translate('Audio');
+  const hasAudioSummary =
+    !!selectedAudioLabel ||
+    audioDetails.length > 0 ||
+    audioScore !== 0 ||
+    audioScoreBreakdown.length > 0;
+  const hasMoreAudioTracks = audioInfo.length > 1;
+  const customFormatScoreFormats = scoredCustomFormats ?? customFormats;
   const subtitleLabel = subs.length > 1 ? translate('MultiLanguage') : subs[0];
   const isMediaInfoPending = mediaInfoStatus === 'pending';
   const isAudioInfoLoading = isMediaInfoPending && !audioDetails.length;
@@ -501,48 +547,34 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
 
       <TableRowCell className={styles.audioInfo}>
         <span className={styles.mediaCellContent}>
-          {audioDetails.length ? (
+          {hasAudioSummary ? (
             <Popover
               anchor={
-                <Label kind={kinds.INVERSE}>
-                  {audioLabel || translate('AudioInfo')}
-                </Label>
-              }
-              title={translate('AudioInfo')}
-              body={
-                <ul className={styles.audioTrackList}>
-                  {audioTrackDetails.map((audio) => {
-                    return (
-                      <li key={audio.key}>
-                        <AudioTrackDetail
-                          audioInfo={audio.audioInfo}
-                          isSelected={audio.isSelected}
-                          selectedAudioTags={selectedAudioTags}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
-              }
-              position={tooltipPositions.LEFT}
-            />
-          ) : null}
+                <span className={styles.audioSummary}>
+                  <Label
+                    className={styles.audioSummaryTag}
+                    kind={kinds.INVERSE}
+                  >
+                    {audioSummaryLabel}
+                  </Label>
 
-          {isAudioInfoLoading ? (
-            <SpinnerIcon
-              className={styles.mediaLoadingIcon}
-              name={icons.SPINNER}
-              isSpinning={true}
-            />
-          ) : null}
-        </span>
-      </TableRowCell>
+                  {hasMoreAudioTracks ? (
+                    <Label
+                      className={styles.audioSummaryTag}
+                      kind={kinds.DEFAULT}
+                    >
+                      {translate('More')}
+                    </Label>
+                  ) : null}
 
-      <TableRowCell className={styles.selectedAudio}>
-        <span className={styles.mediaCellContent}>
-          {selectedAudioLabel ? (
-            <Popover
-              anchor={<Label kind={kinds.INVERSE}>{selectedAudioLabel}</Label>}
+                  <Label
+                    className={styles.audioSummaryTag}
+                    kind={getAudioScoreKind(audioScore)}
+                  >
+                    {audioScoreLabel}
+                  </Label>
+                </span>
+              }
               title={translate('AudioInfo')}
               body={
                 <div className={styles.audioInfoPopover}>
@@ -569,6 +601,20 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
                       <span>{audioLanguagePreferenceName}</span>
                     </div>
                   ) : null}
+
+                  {audioScoreBreakdown.length ? (
+                    <div className={styles.audioScoreBreakdown}>
+                      <span className={styles.audioPreferenceLabel}>
+                        {translate('AudioScoreBreakdown')}:
+                      </span>
+
+                      <ul className={styles.audioScoreBreakdownList}>
+                        {audioScoreBreakdown.map((score, index) => {
+                          return <li key={index}>{score}</li>;
+                        })}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               }
               position={tooltipPositions.LEFT}
@@ -583,25 +629,6 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
             />
           ) : null}
         </span>
-      </TableRowCell>
-
-      <TableRowCell className={styles.audioScore}>
-        {audioScoreBreakdown.length ? (
-          <Popover
-            anchor={audioScoreLabel}
-            title={translate('AudioScoreBreakdown')}
-            body={
-              <ul>
-                {audioScoreBreakdown.map((score, index) => {
-                  return <li key={index}>{score}</li>;
-                })}
-              </ul>
-            }
-            position={tooltipPositions.LEFT}
-          />
-        ) : (
-          audioScoreLabel
-        )}
       </TableRowCell>
 
       <TableRowCell className={styles.subs}>
@@ -641,7 +668,7 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
             customFormatScore,
             customFormats.length
           )}
-          tooltip={<MovieFormats formats={customFormats} />}
+          tooltip={<MovieFormats formats={customFormatScoreFormats} />}
           position={tooltipPositions.LEFT}
         />
       </TableRowCell>

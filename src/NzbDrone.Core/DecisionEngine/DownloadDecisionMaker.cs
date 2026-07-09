@@ -10,6 +10,7 @@ using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.IndexerSearch.Definitions;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
 
@@ -28,6 +29,7 @@ namespace NzbDrone.Core.DecisionEngine
         private readonly IConfigService _configService;
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IRemoteMovieAggregationService _aggregationService;
+        private readonly ILocalizationService _localizationService;
         private readonly Logger _logger;
 
         public DownloadDecisionMaker(IEnumerable<IDownloadDecisionEngineSpecification> specifications,
@@ -35,6 +37,7 @@ namespace NzbDrone.Core.DecisionEngine
                                      IConfigService configService,
                                      ICustomFormatCalculationService formatCalculator,
                                      IRemoteMovieAggregationService aggregationService,
+                                     ILocalizationService localizationService,
                                      Logger logger)
         {
             _specifications = specifications;
@@ -42,6 +45,7 @@ namespace NzbDrone.Core.DecisionEngine
             _configService = configService;
             _formatCalculator = formatCalculator;
             _aggregationService = aggregationService;
+            _localizationService = localizationService;
             _logger = logger;
         }
 
@@ -85,7 +89,10 @@ namespace NzbDrone.Core.DecisionEngine
 
                         if (remoteMovie.Movie == null)
                         {
-                            decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnknownMovie, pushedRelease ? "Unknown Movie. Unable to match to existing movie in Library using release title." : "Unknown Movie. Unable to match to correct movie using release title."));
+                            var key = pushedRelease ? "DownloadRejectionUnknownMoviePushed" : "DownloadRejectionUnknownMovie";
+                            var message = pushedRelease ? "Unknown Movie. Unable to match to existing movie in Library using release title." : "Unknown Movie. Unable to match to correct movie using release title.";
+
+                            decision = new DownloadDecision(remoteMovie, NewRejectionWithKey(DownloadRejectionReason.UnknownMovie, key, message));
                         }
                         else
                         {
@@ -121,7 +128,7 @@ namespace NzbDrone.Core.DecisionEngine
                                 Languages = parsedMovieInfo.Languages
                             };
 
-                            decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.UnableToParse, "Unable to parse release"));
+                            decision = new DownloadDecision(remoteMovie, NewRejection(DownloadRejectionReason.UnableToParse, "Unable to parse release"));
                         }
                     }
                 }
@@ -130,7 +137,7 @@ namespace NzbDrone.Core.DecisionEngine
                     _logger.Error(e, "Couldn't process release.");
 
                     var remoteMovie = new RemoteMovie { Release = report };
-                    decision = new DownloadDecision(remoteMovie, new DownloadRejection(DownloadRejectionReason.Error, "Unexpected error processing release"));
+                    decision = new DownloadDecision(remoteMovie, NewRejection(DownloadRejectionReason.Error, "Unexpected error processing release"));
                 }
 
                 reportNumber++;
@@ -198,7 +205,7 @@ namespace NzbDrone.Core.DecisionEngine
 
                 if (!result.Accepted)
                 {
-                    return new DownloadRejection(result.Reason, result.Message, spec.Type);
+                    return new DownloadRejection(result.Reason, result.GetMessage(_localizationService), spec.Type);
                 }
             }
             catch (NotImplementedException)
@@ -210,10 +217,32 @@ namespace NzbDrone.Core.DecisionEngine
                 e.Data.Add("report", remoteMovie.Release.ToJson());
                 e.Data.Add("parsed", remoteMovie.ParsedMovieInfo.ToJson());
                 _logger.Error(e, "Couldn't evaluate decision on {0}, with spec: {1}", remoteMovie.Release.Title, spec.GetType().Name);
-                return new DownloadRejection(DownloadRejectionReason.DecisionError, $"{spec.GetType().Name}: {e.Message}");
+                return NewRejection(DownloadRejectionReason.DecisionError, "{0}: {1}", spec.Type, spec.GetType().Name, e.Message);
             }
 
             return null;
+        }
+
+        private DownloadRejection NewRejection(DownloadRejectionReason reason, string message, params object[] args)
+        {
+            return NewRejectionWithKey(reason, $"DownloadRejection{reason}", message, RejectionType.Permanent, args);
+        }
+
+        private DownloadRejection NewRejection(DownloadRejectionReason reason, string message, RejectionType type, params object[] args)
+        {
+            return NewRejectionWithKey(reason, $"DownloadRejection{reason}", message, type, args);
+        }
+
+        private DownloadRejection NewRejectionWithKey(DownloadRejectionReason reason, string key, string message, params object[] args)
+        {
+            return NewRejectionWithKey(reason, key, message, RejectionType.Permanent, args);
+        }
+
+        private DownloadRejection NewRejectionWithKey(DownloadRejectionReason reason, string key, string message, RejectionType type, params object[] args)
+        {
+            var decision = DownloadSpecDecision.RejectWithKey(reason, key, message, args);
+
+            return new DownloadRejection(reason, decision.GetMessage(_localizationService), type);
         }
     }
 }

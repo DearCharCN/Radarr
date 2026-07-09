@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.DecisionEngine;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.AudioLanguageMappings;
 using NzbDrone.Core.Profiles.AudioPreferences;
@@ -24,12 +25,15 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
         private static readonly Regex NonAlphaNumericRegex = new (@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly IAudioLanguageMappingService _audioLanguageMappingService;
         private readonly IAudioLanguagePreferenceService _audioLanguagePreferenceService;
+        private readonly ILocalizationService _localizationService;
 
         public ReleaseFilterEvaluator(IAudioLanguageMappingService audioLanguageMappingService = null,
-                                      IAudioLanguagePreferenceService audioLanguagePreferenceService = null)
+                                      IAudioLanguagePreferenceService audioLanguagePreferenceService = null,
+                                      ILocalizationService localizationService = null)
         {
             _audioLanguageMappingService = audioLanguageMappingService;
             _audioLanguagePreferenceService = audioLanguagePreferenceService;
+            _localizationService = localizationService;
         }
 
         public ReleaseFilterEvaluationResult Evaluate(RemoteMovie subject, ReleaseFilterProfile profile)
@@ -41,7 +45,10 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
 
             if (!STJson.TryDeserialize<ReleaseFilterNode>(profile.Filter, out var root))
             {
-                return ReleaseFilterEvaluationResult.Reject($"release filter '{profile.Name}' could not be parsed");
+                return ReleaseFilterEvaluationResult.Reject(Localize("ReleaseFilterCouldNotBeParsed", "release filter '{profileName}' could not be parsed", new Dictionary<string, object>
+                {
+                    { "profileName", profile.Name }
+                }));
             }
 
             var result = EvaluateNode(subject, root);
@@ -51,7 +58,11 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                 return result;
             }
 
-            return ReleaseFilterEvaluationResult.Reject($"release filter '{profile.Name}' rejected release: {result.Reason}");
+            return ReleaseFilterEvaluationResult.Reject(Localize("ReleaseFilterRejectedRelease", "release filter '{profileName}' rejected release: {reason}", new Dictionary<string, object>
+            {
+                { "profileName", profile.Name },
+                { "reason", result.Reason }
+            }));
         }
 
         public bool RequiresMediaInfo(ReleaseFilterProfile profile)
@@ -111,7 +122,7 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                     reasons.Add(result.Reason);
                 }
 
-                return ReleaseFilterEvaluationResult.Reject(reasons.Where(x => x.IsNotNullOrWhiteSpace()).FirstOrDefault() ?? "no OR condition matched");
+                return ReleaseFilterEvaluationResult.Reject(reasons.Where(x => x.IsNotNullOrWhiteSpace()).FirstOrDefault() ?? Localize("ReleaseFilterNoOrConditionMatched", "no OR condition matched"));
             }
 
             foreach (var child in children)
@@ -131,21 +142,29 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
         {
             if (node.Field.IsNullOrWhiteSpace())
             {
-                return ReleaseFilterEvaluationResult.Reject("condition has no field");
+                return ReleaseFilterEvaluationResult.Reject(Localize("ReleaseFilterConditionHasNoField", "condition has no field"));
             }
 
             var value = GetFieldValue(subject, node.Field);
+            var fieldLabel = LocalizeField(node.Field);
 
             if (!value.Exists)
             {
-                return ReleaseFilterEvaluationResult.Reject($"{node.Field} is unavailable");
+                return ReleaseFilterEvaluationResult.Reject(Localize("ReleaseFilterFieldUnavailable", "{field} is unavailable", new Dictionary<string, object>
+                {
+                    { "field", fieldLabel }
+                }));
             }
 
             var result = EvaluateValue(value, node.Operator, node.Value);
 
             return result ?
                 ReleaseFilterEvaluationResult.Accept() :
-                ReleaseFilterEvaluationResult.Reject($"{node.Field} did not match {node.Operator}");
+                ReleaseFilterEvaluationResult.Reject(Localize("ReleaseFilterConditionDidNotMatch", "{field} did not match {operator}", new Dictionary<string, object>
+                {
+                    { "field", fieldLabel },
+                    { "operator", LocalizeOperator(node.Operator) }
+                }));
         }
 
         private ReleaseFilterValue GetFieldValue(RemoteMovie subject, string field)
@@ -556,6 +575,81 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
         private static string NormalizeText(string value)
         {
             return (value ?? string.Empty).Trim().ToLowerInvariant();
+        }
+
+        private string LocalizeField(string field)
+        {
+            var key = NormalizeKey(field) switch
+            {
+                "title" or "releasetitle" => "Title",
+                "indexer" => "Indexer",
+                "protocol" => "Protocol",
+                "quality" or "qualityname" or "qualityid" => "Quality",
+                "customformats" or "customformat" => "CustomFormats",
+                "customformatscore" => "CustomFormatScore",
+                "size" => "Size",
+                "age" or "agedays" or "agehours" or "ageminutes" => "Age",
+                "seeders" => "Seeders",
+                "peers" => "Peers",
+                "leechers" => "Leechers",
+                "indexerflags" or "flags" => "IndexerFlags",
+                "releasegroup" or "group" => "ReleaseGroup",
+                "languages" or "language" => "Languages",
+                "audiolanguages" or "audiolanguage" => "AudioLanguages",
+                "audiolanguagetags" or "audiolanguagetag" or "audiotags" or "audiotag" => "AudioLanguageTags",
+                "audioinfo" or "audio" => "AudioInfo",
+                "audiospecifications" or "audiospecification" or "audiospec" => "AudioSpecifications",
+                "subtitlelanguages" or "subtitlelanguage" or "subtitles" or "subs" => "SubtitleLanguages",
+                "selectedaudio" or "preferredaudio" => "SelectedAudio",
+                "selectedaudiolanguage" or "preferredaudiolanguage" => "SelectedAudioLanguage",
+                "selectedaudiospecification" or "selectedaudiospec" or "preferredaudiospecification" or "preferredaudiospec" => "SelectedAudioSpecification",
+                "selectedaudiotags" or "selectedaudiotag" or "preferredaudiotags" or "preferredaudiotag" => "SelectedAudioTags",
+                "audioscore" or "audiopreferencescore" => "AudioScore",
+                "haschineseaudioorsubtitle" or "chineseaccessible" => "HasChineseAudioOrSubtitle",
+                "hasoriginaudio" or "hasoriginalaudio" => "HasOriginAudio",
+                "mediainfostatus" or "additionaldatastatus" => "MediaInfoStatus",
+                _ => null
+            };
+
+            return key == null ? field : Localize(key, field);
+        }
+
+        private string LocalizeOperator(string op)
+        {
+            var key = NormalizeKey(op) switch
+            {
+                "" or "equal" or "equals" or "is" or "in" => "FilterIs",
+                "notequal" or "notequals" or "isnot" or "notin" => "FilterIsNot",
+                "contains" or "has" => "FilterContains",
+                "notcontains" or "doesnotcontain" or "nothas" => "FilterDoesNotContain",
+                "exists" or "present" => "FilterExists",
+                "notexists" or "missing" => "FilterDoesNotExist",
+                "greaterthan" or "gt" => "FilterGreaterThan",
+                "greaterthanorequal" or "greaterthanorequals" or "gte" => "FilterGreaterThanOrEqual",
+                "lessthan" or "lt" => "FilterLessThan",
+                "lessthanorequal" or "lessthanorequals" or "lte" => "FilterLessThanOrEqual",
+                _ => null
+            };
+
+            return key == null ? op : Localize(key, op);
+        }
+
+        private string Localize(string key, string fallback, Dictionary<string, object> tokens = null)
+        {
+            tokens ??= new Dictionary<string, object>();
+            var localized = _localizationService?.GetLocalizedString(key, tokens);
+
+            if (localized.IsNotNullOrWhiteSpace() && localized != key)
+            {
+                return localized;
+            }
+
+            foreach (var token in tokens)
+            {
+                fallback = fallback.Replace($"{{{token.Key}}}", token.Value?.ToString());
+            }
+
+            return fallback;
         }
     }
 

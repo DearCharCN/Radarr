@@ -85,18 +85,6 @@ const columns: Column[] = [
     isVisible: true,
   },
   {
-    name: 'selectedAudioInfo',
-    label: () => translate('SelectedAudio'),
-    isSortable: true,
-    isVisible: true,
-  },
-  {
-    name: 'audioScore',
-    label: () => translate('AudioScore'),
-    isSortable: true,
-    isVisible: true,
-  },
-  {
     name: 'subs',
     label: () => translate('Subtitles'),
     isSortable: true,

@@ -6,7 +6,10 @@ interface CssExports {
   'audioInfoPopover': string;
   'audioPreference': string;
   'audioPreferenceLabel': string;
-  'audioScore': string;
+  'audioScoreBreakdown': string;
+  'audioScoreBreakdownList': string;
+  'audioSummary': string;
+  'audioSummaryTag': string;
   'audioTrack': string;
   'audioTrackList': string;
   'audioTrackTag': string;
@@ -30,7 +33,6 @@ interface CssExports {
   'protocol': string;
   'quality': string;
   'rejected': string;
-  'selectedAudio': string;
   'size': string;
   'subs': string;
   'titleContent': string;

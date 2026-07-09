@@ -101,7 +101,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 profile.Name,
                 result.Reason);
 
-            return DownloadSpecDecision.Reject(DownloadRejectionReason.ReleaseFilterRejected, result.Reason);
+            return DownloadSpecDecision.Reject(DownloadRejectionReason.ReleaseFilterRejected, "{0}", result.Reason);
         }
     }
 

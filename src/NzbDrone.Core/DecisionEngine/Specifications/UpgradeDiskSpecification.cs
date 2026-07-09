@@ -52,7 +52,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 var cutoff = qualityProfile.UpgradeAllowed ? qualityProfile.Cutoff : qualityProfile.FirststAllowedQuality().Id;
                 var qualityCutoff = qualityProfile.Items[qualityProfile.GetIndex(cutoff).Index];
 
-                return DownloadSpecDecision.Reject(DownloadRejectionReason.DiskCutoffMet, "Existing file meets cutoff: {0} [{1}]", qualityCutoff, customFormats.ConcatToString());
+                return DownloadSpecDecision.RejectWithKey(DownloadRejectionReason.DiskCutoffMet, "DownloadRejectionDiskExistingFileMeetsCutoff", "Existing file meets cutoff: {0} [{1}]", qualityCutoff, customFormats.ConcatToString());
             }
 
             var upgradeableRejectReason = _upgradableSpecification.IsUpgradable(qualityProfile,
@@ -79,7 +79,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                     return DownloadSpecDecision.Reject(DownloadRejectionReason.DiskCustomFormatCutoffMet, "Existing file on disk meets Custom Format cutoff: {0}", qualityProfile.CutoffFormatScore);
 
                 case UpgradeableRejectReason.CustomFormatScore:
-                    return DownloadSpecDecision.Reject(DownloadRejectionReason.DiskCustomFormatScore, "Existing file on disk has a equal or higher Custom Format score: {0}", qualityProfile.CalculateCustomFormatScore(customFormats));
+                    return DownloadSpecDecision.Reject(DownloadRejectionReason.DiskCustomFormatScore, "Existing file on disk has an equal or higher Custom Format score: {0}", qualityProfile.CalculateCustomFormatScore(customFormats));
 
                 case UpgradeableRejectReason.MinCustomFormatScore:
                     return DownloadSpecDecision.Reject(DownloadRejectionReason.DiskCustomFormatScoreIncrement, "Existing file on disk has Custom Format score within Custom Format score increment: {0}", qualityProfile.MinUpgradeFormatScore);
