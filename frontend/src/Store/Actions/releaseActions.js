@@ -268,7 +268,7 @@ export const defaultState = {
     },
     {
       name: 'audioInfo',
-      label: () => translate('AudioInfo'),
+      label: () => translate('Audio'),
       type: filterBuilderTypes.STRING
     },
     {
@@ -283,7 +283,7 @@ export const defaultState = {
     },
     {
       name: 'subs',
-      label: () => translate('SubtitleLanguages'),
+      label: () => translate('Subtitles'),
       type: filterBuilderTypes.STRING
     },
     {

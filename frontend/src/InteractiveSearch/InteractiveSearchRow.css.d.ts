@@ -3,7 +3,13 @@
 interface CssExports {
   'age': string;
   'audioInfo': string;
+  'audioInfoPopover': string;
+  'audioPreference': string;
+  'audioPreferenceLabel': string;
   'audioScore': string;
+  'audioTrack': string;
+  'audioTrackList': string;
+  'audioTrackTag': string;
   'blocklist': string;
   'customFormatScore': string;
   'download': string;

@@ -80,7 +80,7 @@ const columns: Column[] = [
   },
   {
     name: 'audioInfo',
-    label: () => translate('AudioInfo'),
+    label: () => translate('Audio'),
     isSortable: true,
     isVisible: true,
   },
@@ -98,7 +98,7 @@ const columns: Column[] = [
   },
   {
     name: 'subs',
-    label: () => translate('SubtitleLanguages'),
+    label: () => translate('Subtitles'),
     isSortable: true,
     isVisible: true,
   },

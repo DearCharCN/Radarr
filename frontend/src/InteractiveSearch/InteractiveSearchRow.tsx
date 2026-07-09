@@ -73,12 +73,22 @@ function getDownloadTooltip(
   return translate('AddToDownloadQueue');
 }
 
-function formatAudioInfo(audioInfo: ReleaseAudioInfo, displayLanguage?: string) {
-  const language = (
+function getAudioLanguage(
+  audioInfo: ReleaseAudioInfo,
+  displayLanguage?: string
+) {
+  return (
     displayLanguage ||
     audioInfo.mappedLanguage?.name ||
     audioInfo.language
   )?.trim();
+}
+
+function formatAudioInfo(
+  audioInfo: ReleaseAudioInfo,
+  displayLanguage?: string
+) {
+  const language = getAudioLanguage(audioInfo, displayLanguage);
   const specification = audioInfo.specification?.trim();
 
   if (language && specification) {
@@ -86,6 +96,97 @@ function formatAudioInfo(audioInfo: ReleaseAudioInfo, displayLanguage?: string) 
   }
 
   return language || specification || '';
+}
+
+function formatAudioDescription(
+  audioInfo: ReleaseAudioInfo,
+  displayLanguage?: string
+) {
+  const language = getAudioLanguage(audioInfo, displayLanguage);
+  const specification = audioInfo.specification?.trim();
+
+  if (language && specification) {
+    return `${language} ${specification}`;
+  }
+
+  return language || specification || '';
+}
+
+function normalizeAudioPart(value?: string) {
+  return (value || '').trim().toLocaleLowerCase();
+}
+
+function isSelectedAudioTrack(
+  audioInfo: ReleaseAudioInfo,
+  selectedAudioInfo?: ReleaseAudioInfo,
+  selectedAudioLanguage?: string
+) {
+  if (!selectedAudioInfo) {
+    return false;
+  }
+
+  return (
+    normalizeAudioPart(getAudioLanguage(audioInfo)) ===
+      normalizeAudioPart(
+        getAudioLanguage(selectedAudioInfo, selectedAudioLanguage)
+      ) &&
+    normalizeAudioPart(audioInfo.specification) ===
+      normalizeAudioPart(selectedAudioInfo.specification)
+  );
+}
+
+function getAudioTrackTags(
+  audioInfo: ReleaseAudioInfo,
+  isSelected: boolean,
+  selectedAudioTags: string[]
+) {
+  const tags = isSelected
+    ? [
+        translate('Selected'),
+        ...(selectedAudioTags.length
+          ? selectedAudioTags
+          : audioInfo.languageTags || []),
+      ]
+    : audioInfo.languageTags || [];
+
+  return Array.from(
+    new Set(
+      tags
+        .map((tag) => tag?.trim())
+        .filter((tag): tag is string => Boolean(tag))
+    )
+  );
+}
+
+interface AudioTrackDetailProps {
+  audioInfo: ReleaseAudioInfo;
+  displayLanguage?: string;
+  isSelected: boolean;
+  selectedAudioTags: string[];
+}
+
+function AudioTrackDetail({
+  audioInfo,
+  displayLanguage,
+  isSelected,
+  selectedAudioTags,
+}: AudioTrackDetailProps) {
+  const tags = getAudioTrackTags(audioInfo, isSelected, selectedAudioTags);
+  const description = formatAudioDescription(audioInfo, displayLanguage);
+
+  return (
+    <span className={styles.audioTrack}>
+      {tags.map((tag) => {
+        return (
+          <span key={tag} className={styles.audioTrackTag}>
+            {tag}
+          </span>
+        );
+      })}
+
+      <span>{description}</span>
+    </span>
+  );
 }
 
 function releaseHistorySelector({ guid }: Release) {
@@ -175,7 +276,9 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
 
   const [isConfirmGrabModalOpen, setIsConfirmGrabModalOpen] = useState(false);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
-  const audioDetails = audioInfo.map((audio) => formatAudioInfo(audio)).filter(Boolean);
+  const audioDetails = audioInfo
+    .map((audio) => formatAudioInfo(audio))
+    .filter(Boolean);
   const audioLabel =
     audioDetails.length > 1
       ? translate('MultiLanguage')
@@ -183,14 +286,35 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
   const selectedAudioLabel = selectedAudioInfo
     ? formatAudioInfo(selectedAudioInfo, selectedAudioLanguage)
     : '';
-  const selectedAudioDetails = [
-    selectedAudioLabel,
-    selectedAudioTags.length ? `${translate('Tags')}: ${selectedAudioTags.join(', ')}` : null,
-    audioLanguagePreferenceName ? `${translate('AudioLanguagePreference')}: ${audioLanguagePreferenceName}` : null,
-  ].filter(Boolean);
+  const audioTrackDetails = audioInfo.map((audio, index) => {
+    return {
+      key: `${index}-${formatAudioInfo(audio)}`,
+      audioInfo: audio,
+      displayLanguage: undefined,
+      isSelected: isSelectedAudioTrack(
+        audio,
+        selectedAudioInfo,
+        selectedAudioLanguage
+      ),
+    };
+  });
+  const hasSelectedAudioTrack = audioTrackDetails.some((audio) => {
+    return audio.isSelected;
+  });
+  const selectedAudioTrackDetails =
+    selectedAudioInfo && !hasSelectedAudioTrack
+      ? [
+          ...audioTrackDetails,
+          {
+            key: 'selectedAudio',
+            audioInfo: selectedAudioInfo,
+            displayLanguage: selectedAudioLanguage,
+            isSelected: true,
+          },
+        ]
+      : audioTrackDetails;
   const audioScoreLabel = audioScore > 0 ? `+${audioScore}` : `${audioScore}`;
-  const subtitleLabel =
-    subs.length > 1 ? translate('MultiLanguage') : subs[0];
+  const subtitleLabel = subs.length > 1 ? translate('MultiLanguage') : subs[0];
   const isMediaInfoPending = mediaInfoStatus === 'pending';
   const isAudioInfoLoading = isMediaInfoPending && !audioDetails.length;
   const isSubsLoading = isMediaInfoPending && !subs.length;
@@ -336,9 +460,17 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
               }
               title={translate('AudioInfo')}
               body={
-                <ul>
-                  {audioDetails.map((audio, index) => {
-                    return <li key={index}>{audio}</li>;
+                <ul className={styles.audioTrackList}>
+                  {audioTrackDetails.map((audio) => {
+                    return (
+                      <li key={audio.key}>
+                        <AudioTrackDetail
+                          audioInfo={audio.audioInfo}
+                          isSelected={audio.isSelected}
+                          selectedAudioTags={selectedAudioTags}
+                        />
+                      </li>
+                    );
                   })}
                 </ul>
               }
@@ -361,13 +493,33 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
           {selectedAudioLabel ? (
             <Popover
               anchor={<Label kind={kinds.INVERSE}>{selectedAudioLabel}</Label>}
-              title={translate('SelectedAudio')}
+              title={translate('AudioInfo')}
               body={
-                <ul>
-                  {selectedAudioDetails.map((detail, index) => {
-                    return <li key={index}>{detail}</li>;
-                  })}
-                </ul>
+                <div className={styles.audioInfoPopover}>
+                  <ul className={styles.audioTrackList}>
+                    {selectedAudioTrackDetails.map((audio) => {
+                      return (
+                        <li key={audio.key}>
+                          <AudioTrackDetail
+                            audioInfo={audio.audioInfo}
+                            displayLanguage={audio.displayLanguage}
+                            isSelected={audio.isSelected}
+                            selectedAudioTags={selectedAudioTags}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {audioLanguagePreferenceName ? (
+                    <div className={styles.audioPreference}>
+                      <span className={styles.audioPreferenceLabel}>
+                        {translate('AudioLanguagePreference')}:
+                      </span>
+                      <span>{audioLanguagePreferenceName}</span>
+                    </div>
+                  ) : null}
+                </div>
               }
               position={tooltipPositions.LEFT}
             />
@@ -407,7 +559,7 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
           {subs.length ? (
             <Popover
               anchor={<Label kind={kinds.INVERSE}>{subtitleLabel}</Label>}
-              title={translate('SubtitleLanguages')}
+              title={translate('Subtitles')}
               body={
                 <ul>
                   {subs.map((subtitle, index) => {

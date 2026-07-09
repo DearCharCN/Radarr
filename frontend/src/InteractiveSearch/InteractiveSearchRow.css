@@ -34,13 +34,13 @@
 }
 
 .audioInfo {
-  width: 180px;
   max-width: 180px;
+  width: 180px;
 }
 
 .selectedAudio {
-  width: 160px;
   max-width: 160px;
+  width: 160px;
 }
 
 .audioScore {
@@ -52,19 +52,63 @@
 }
 
 .subs {
-  width: 130px;
   max-width: 130px;
+  width: 130px;
 }
 
 .mediaCellContent {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+
   min-height: 18px;
 }
 
 .mediaLoadingIcon {
   flex: 0 0 auto;
+}
+
+.audioInfoPopover {
+  min-width: 260px;
+}
+
+.audioTrackList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li + li {
+    margin-top: 6px;
+  }
+}
+
+.audioTrack {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.audioTrackTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  min-height: 18px;
+  border: 1px solid var(--themeDarkColor);
+  border-radius: 2px;
+  color: var(--themeDarkColor);
+  line-height: 14px;
+}
+
+.audioPreference {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--borderColor);
+}
+
+.audioPreferenceLabel {
+  margin-right: 4px;
+  font-weight: bold;
 }
 
 .customFormatScore {
