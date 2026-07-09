@@ -36,6 +36,7 @@ using NzbDrone.Core.Notifications;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 using NzbDrone.Core.Profiles.Delay;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Profiles.ReleaseFilters;
@@ -157,6 +158,7 @@ namespace NzbDrone.Core.Datastore
             Mapper.Entity<RemotePathMapping>("RemotePathMappings").RegisterModel();
             Mapper.Entity<Tag>("Tags").RegisterModel();
             Mapper.Entity<ReleaseProfile>("ReleaseProfiles").RegisterModel();
+            Mapper.Entity<AudioLanguageMapping>("AudioLanguageMappings").RegisterModel();
             Mapper.Entity<ReleaseFilterProfile>("ReleaseFilterProfiles").RegisterModel();
 
             Mapper.Entity<DelayProfile>("DelayProfiles").RegisterModel();

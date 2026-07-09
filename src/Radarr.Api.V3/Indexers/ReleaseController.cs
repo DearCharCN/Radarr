@@ -18,6 +18,7 @@ using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Validation;
 using Radarr.Http;
@@ -36,6 +37,7 @@ namespace Radarr.Api.V3.Indexers
         private readonly IDownloadService _downloadService;
         private readonly IMovieService _movieService;
         private readonly IIndexerFactory _indexerFactory;
+        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
@@ -48,6 +50,7 @@ namespace Radarr.Api.V3.Indexers
                              IDownloadService downloadService,
                              IMovieService movieService,
                              IIndexerFactory indexerFactory,
+                             IAudioLanguageMappingService audioLanguageMappingService,
                              IHttpClient httpClient,
                              ICacheManager cacheManager,
                              IQualityProfileService qualityProfileService,
@@ -61,6 +64,7 @@ namespace Radarr.Api.V3.Indexers
             _downloadService = downloadService;
             _movieService = movieService;
             _indexerFactory = indexerFactory;
+            _audioLanguageMappingService = audioLanguageMappingService;
             _httpClient = httpClient;
             _logger = logger;
 
@@ -222,7 +226,8 @@ namespace Radarr.Api.V3.Indexers
             remoteMovie.Release.MediaInfoProgressCompleted = result.MediaInfoProgressCompleted;
             remoteMovie.Release.MediaInfoProgressTotal = result.MediaInfoProgressTotal;
             remoteMovie.Release.ProwlarrIndexerId = prowlarrIndexerId;
-            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie);
+            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie, _audioLanguageMappingService);
+            result.AudioInfo = remoteMovie.Release.AudioInfo;
             result.PreferredAudioInfo = chineseMediaPreference.SelectedAudio;
             result.AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore;
             result.HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle;
@@ -336,6 +341,13 @@ namespace Radarr.Api.V3.Indexers
         protected override ReleaseResource MapDecision(DownloadDecision decision, int initialWeight)
         {
             var resource = base.MapDecision(decision, initialWeight);
+            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(decision.RemoteMovie, _audioLanguageMappingService);
+
+            resource.AudioInfo = decision.RemoteMovie.Release.AudioInfo;
+            resource.PreferredAudioInfo = chineseMediaPreference.SelectedAudio;
+            resource.AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore;
+            resource.HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle;
+
             _remoteMovieCache.Set(GetCacheKey(resource), decision.RemoteMovie, TimeSpan.FromMinutes(30));
 
             return resource;

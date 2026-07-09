@@ -5,6 +5,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 using NzbDrone.Core.Profiles.Delay;
 using NzbDrone.Core.Qualities;
 
@@ -15,15 +16,20 @@ namespace NzbDrone.Core.DecisionEngine
         private readonly IConfigService _configService;
         private readonly IDelayProfileService _delayProfileService;
         private readonly IQualityDefinitionService _qualityDefinitionService;
+        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
 
         public delegate int CompareDelegate(DownloadDecision x, DownloadDecision y);
         public delegate int CompareDelegate<TSubject, TValue>(DownloadDecision x, DownloadDecision y);
 
-        public DownloadDecisionComparer(IConfigService configService, IDelayProfileService delayProfileService, IQualityDefinitionService qualityDefinitionService)
+        public DownloadDecisionComparer(IConfigService configService,
+                                        IDelayProfileService delayProfileService,
+                                        IQualityDefinitionService qualityDefinitionService,
+                                        IAudioLanguageMappingService audioLanguageMappingService)
         {
             _configService = configService;
             _delayProfileService = delayProfileService;
             _qualityDefinitionService = qualityDefinitionService;
+            _audioLanguageMappingService = audioLanguageMappingService;
         }
 
         public int Compare(DownloadDecision x, DownloadDecision y)
@@ -87,7 +93,7 @@ namespace NzbDrone.Core.DecisionEngine
 
         private int CompareChineseAudioPreference(DownloadDecision x, DownloadDecision y)
         {
-            return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie).AudioPreferenceScore);
+            return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie, _audioLanguageMappingService).AudioPreferenceScore);
         }
 
         private int CompareIndexerFlags(DownloadDecision x, DownloadDecision y)

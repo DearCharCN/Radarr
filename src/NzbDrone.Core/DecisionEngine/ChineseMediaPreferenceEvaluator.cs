@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 
 namespace NzbDrone.Core.DecisionEngine
 {
@@ -19,13 +20,14 @@ namespace NzbDrone.Core.DecisionEngine
         private static readonly Regex ChannelRegex = new (@"(?<!\d)(?<channels>[257])\.1(?!\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex NonAlphaNumericRegex = new (@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static ChineseMediaPreferenceResult Evaluate(RemoteMovie subject)
+        public static ChineseMediaPreferenceResult Evaluate(RemoteMovie subject, IAudioLanguageMappingService audioLanguageMappingService = null)
         {
             var release = subject?.Release;
-            var audioInfo = release?.AudioInfo ?? new List<ReleaseAudioInfo>();
+            var audioInfo = audioLanguageMappingService?.TagAudioTracks(subject) ??
+                            AudioLanguageMapper.TagAudioTracks(subject, release?.AudioInfo);
             var originalLanguage = subject?.Movie?.MovieMetadata?.Value?.OriginalLanguage ?? Language.Unknown;
             var hasChineseSubtitle = release?.Subs?.Any(IsChineseText) == true;
-            var hasChineseAudio = audioInfo.Any(x => IsChineseText(x.Language)) ||
+            var hasChineseAudio = audioInfo.Any(x => AudioLanguageMapper.HasLanguage(x, Language.Chinese)) ||
                                   subject?.Languages?.Contains(Language.Chinese) == true;
 
             var chineseAudio = BestAudioForLanguage(audioInfo, Language.Chinese);
@@ -33,6 +35,7 @@ namespace NzbDrone.Core.DecisionEngine
             if (chineseAudio == null && hasChineseAudio)
             {
                 chineseAudio = new ReleaseAudioInfo { Language = Language.Chinese.Name };
+                chineseAudio = AudioLanguageMapper.TagAudioTrack(subject, chineseAudio);
             }
 
             var selectedAudio = SelectAudio(audioInfo, chineseAudio, hasChineseSubtitle, originalLanguage);
@@ -95,7 +98,7 @@ namespace NzbDrone.Core.DecisionEngine
             }
 
             return audioInfo
-                .Where(x => IsLanguage(x.Language, language))
+                .Where(x => AudioLanguageMapper.HasLanguage(x, language))
                 .OrderByDescending(AudioSpecificationRank)
                 .FirstOrDefault();
         }

@@ -69,6 +69,26 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         }
 
         [Test]
+        public void should_select_chinese_audio_when_language_is_mapped_alias()
+        {
+            var remoteMovie = GivenRemoteMovie(
+                Language.English,
+                new List<ReleaseAudioInfo>
+                {
+                    new () { Language = "English", Specification = "TrueHD Atmos 7.1" },
+                    new () { Language = "Guoyu", Specification = "DDP 5.1" }
+                },
+                new List<string> { "Chinese" });
+
+            var result = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie);
+
+            result.SelectedAudio.Language.Should().Be("Guoyu");
+            result.SelectedAudio.MappedLanguage.Should().Be(Language.Chinese);
+            result.SelectedAudio.LanguageTags.Should().Contain("Chinese");
+            result.AudioPreferenceScore.Should().Be(30);
+        }
+
+        [Test]
         public void should_select_original_audio_when_chinese_audio_is_below_minimum_and_original_is_better_with_chinese_subtitles()
         {
             var remoteMovie = GivenRemoteMovie(

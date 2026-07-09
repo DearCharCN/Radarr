@@ -8,6 +8,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 
 namespace NzbDrone.Core.Profiles.ReleaseFilters
 {
@@ -20,6 +21,12 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
     public class ReleaseFilterEvaluator : IReleaseFilterEvaluator
     {
         private static readonly Regex NonAlphaNumericRegex = new (@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
+
+        public ReleaseFilterEvaluator(IAudioLanguageMappingService audioLanguageMappingService = null)
+        {
+            _audioLanguageMappingService = audioLanguageMappingService;
+        }
 
         public ReleaseFilterEvaluationResult Evaluate(RemoteMovie subject, ReleaseFilterProfile profile)
         {
@@ -199,14 +206,19 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                     return ReleaseFilterValue.FromStrings(subject?.Languages?.Select(x => x.Name));
                 case "audiolanguages":
                 case "audiolanguage":
-                    return ReleaseFilterValue.FromStrings(release?.AudioInfo?.Select(x => x.Language));
+                    return ReleaseFilterValue.FromStrings(GetAudioLanguageValues(subject));
+                case "audiolanguagetags":
+                case "audiolanguagetag":
+                case "audiotags":
+                case "audiotag":
+                    return ReleaseFilterValue.FromStrings(GetAudioLanguageTags(subject));
                 case "audioinfo":
                 case "audio":
-                    return ReleaseFilterValue.FromStrings(release?.AudioInfo?.Select(FormatAudioInfo));
+                    return ReleaseFilterValue.FromStrings(TagAudioTracks(subject).Select(FormatAudioInfo));
                 case "audiospecifications":
                 case "audiospecification":
                 case "audiospec":
-                    return ReleaseFilterValue.FromStrings(release?.AudioInfo?.Select(x => x.Specification));
+                    return ReleaseFilterValue.FromStrings(TagAudioTracks(subject).Select(x => x.Specification));
                 case "subtitlelanguages":
                 case "subtitlelanguage":
                 case "subtitles":
@@ -214,21 +226,29 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                     return ReleaseFilterValue.FromStrings(release?.Subs);
                 case "selectedaudio":
                 case "preferredaudio":
-                    return ReleaseFilterValue.FromString(FormatAudioInfo(ChineseMediaPreferenceEvaluator.Evaluate(subject).SelectedAudio));
+                    return ReleaseFilterValue.FromString(FormatAudioInfo(GetChineseMediaPreference(subject).SelectedAudio));
                 case "selectedaudiolanguage":
                 case "preferredaudiolanguage":
-                    return ReleaseFilterValue.FromString(ChineseMediaPreferenceEvaluator.Evaluate(subject).SelectedAudio?.Language);
+                    return ReleaseFilterValue.FromString(GetDisplayLanguage(GetChineseMediaPreference(subject).SelectedAudio));
                 case "selectedaudiospecification":
                 case "selectedaudiospec":
                 case "preferredaudiospecification":
                 case "preferredaudiospec":
-                    return ReleaseFilterValue.FromString(ChineseMediaPreferenceEvaluator.Evaluate(subject).SelectedAudio?.Specification);
+                    return ReleaseFilterValue.FromString(GetChineseMediaPreference(subject).SelectedAudio?.Specification);
+                case "selectedaudiotags":
+                case "selectedaudiotag":
+                case "preferredaudiotags":
+                case "preferredaudiotag":
+                    return ReleaseFilterValue.FromStrings(GetChineseMediaPreference(subject).SelectedAudio?.LanguageTags);
                 case "audioscore":
                 case "audiopreferencescore":
-                    return ReleaseFilterValue.FromNumber(ChineseMediaPreferenceEvaluator.Evaluate(subject).AudioPreferenceScore);
+                    return ReleaseFilterValue.FromNumber(GetChineseMediaPreference(subject).AudioPreferenceScore);
                 case "haschineseaudioorsubtitle":
                 case "chineseaccessible":
-                    return ReleaseFilterValue.FromBool(ChineseMediaPreferenceEvaluator.Evaluate(subject).HasChineseAudioOrSubtitle);
+                    return ReleaseFilterValue.FromBool(GetChineseMediaPreference(subject).HasChineseAudioOrSubtitle);
+                case "hasoriginaudio":
+                case "hasoriginalaudio":
+                    return ReleaseFilterValue.FromBool(TagAudioTracks(subject).Any(audio => AudioLanguageMapper.HasTag(audio, AudioLanguageMapper.OriginTag)));
                 case "mediainfostatus":
                 case "additionaldatastatus":
                     return ReleaseFilterValue.FromString(release?.MediaInfoStatus ?? release?.MediaInfoProgressStatus);
@@ -258,6 +278,10 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
             {
                 case "audiolanguages":
                 case "audiolanguage":
+                case "audiolanguagetags":
+                case "audiolanguagetag":
+                case "audiotags":
+                case "audiotag":
                 case "audioinfo":
                 case "audio":
                 case "audiospecifications":
@@ -275,14 +299,53 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                 case "selectedaudiospec":
                 case "preferredaudiospecification":
                 case "preferredaudiospec":
+                case "selectedaudiotags":
+                case "selectedaudiotag":
+                case "preferredaudiotags":
+                case "preferredaudiotag":
                 case "audioscore":
                 case "audiopreferencescore":
                 case "haschineseaudioorsubtitle":
                 case "chineseaccessible":
+                case "hasoriginaudio":
+                case "hasoriginalaudio":
                     return true;
                 default:
                     return false;
             }
+        }
+
+        private List<ReleaseAudioInfo> TagAudioTracks(RemoteMovie subject)
+        {
+            return _audioLanguageMappingService?.TagAudioTracks(subject) ??
+                   AudioLanguageMapper.TagAudioTracks(subject, subject?.Release?.AudioInfo);
+        }
+
+        private IEnumerable<string> GetAudioLanguageValues(RemoteMovie subject)
+        {
+            return TagAudioTracks(subject)
+                .SelectMany(audio => new[] { audio.Language, audio.MappedLanguage?.Name }
+                    .Concat(audio.LanguageTags ?? new List<string>()))
+                .Where(value => value.IsNotNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private IEnumerable<string> GetAudioLanguageTags(RemoteMovie subject)
+        {
+            return TagAudioTracks(subject)
+                .SelectMany(audio => audio.LanguageTags ?? new List<string>())
+                .Where(value => value.IsNotNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private ChineseMediaPreferenceResult GetChineseMediaPreference(RemoteMovie subject)
+        {
+            return ChineseMediaPreferenceEvaluator.Evaluate(subject, _audioLanguageMappingService);
+        }
+
+        private static string GetDisplayLanguage(ReleaseAudioInfo audioInfo)
+        {
+            return audioInfo?.MappedLanguage?.Name ?? audioInfo?.Language;
         }
 
         private static string FormatAudioInfo(ReleaseAudioInfo audioInfo)

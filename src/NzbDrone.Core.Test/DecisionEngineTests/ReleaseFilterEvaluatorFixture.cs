@@ -7,6 +7,7 @@ using NzbDrone.Common.Serializer;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.ReleaseFilters;
 using NzbDrone.Core.Qualities;
@@ -42,6 +43,13 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                     ReleaseGroup = "Group"
                 },
                 Languages = new List<Language> { Language.English },
+                Movie = new Movie
+                {
+                    MovieMetadata = new MovieMetadata
+                    {
+                        OriginalLanguage = Language.English
+                    }
+                },
                 CustomFormats = new List<CustomFormat> { new ("DoVi") },
                 CustomFormatScore = 100
             };
@@ -132,6 +140,27 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                 Condition("selectedAudioSpecification", "contains", "DDP"),
                 Condition("audioScore", "greaterThanOrEqual", 30),
                 Condition("hasChineseAudioOrSubtitle", "equal", true)));
+
+            var result = _evaluator.Evaluate(_remoteMovie, profile);
+
+            result.Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_match_mapped_audio_language_and_origin_tags()
+        {
+            _remoteMovie.Release.AudioInfo = new List<ReleaseAudioInfo>
+            {
+                new () { Language = "English", Specification = "TrueHD Atmos 7.1" },
+                new () { Language = "Guoyu", Specification = "DDP 5.1" }
+            };
+            _remoteMovie.Release.Subs = new List<string> { "Chinese" };
+
+            var profile = GivenProfile(Group("and",
+                Condition("audioLanguages", "contains", "Chinese"),
+                Condition("audioLanguageTags", "contains", "Origin"),
+                Condition("selectedAudioLanguage", "equal", "Chinese"),
+                Condition("selectedAudioTags", "contains", "Chinese")));
 
             var result = _evaluator.Evaluate(_remoteMovie, profile);
 

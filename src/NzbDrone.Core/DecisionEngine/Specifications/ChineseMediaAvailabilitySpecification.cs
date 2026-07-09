@@ -1,15 +1,18 @@
 using NLog;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.AudioLanguageMappings;
 
 namespace NzbDrone.Core.DecisionEngine.Specifications
 {
     public class ChineseMediaInfoPendingSpecification : IDownloadDecisionEngineSpecification
     {
+        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
         private readonly Logger _logger;
 
-        public ChineseMediaInfoPendingSpecification(Logger logger)
+        public ChineseMediaInfoPendingSpecification(IAudioLanguageMappingService audioLanguageMappingService, Logger logger)
         {
+            _audioLanguageMappingService = audioLanguageMappingService;
             _logger = logger;
         }
 
@@ -18,7 +21,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
 
         public DownloadSpecDecision IsSatisfiedBy(RemoteMovie subject, SearchCriteriaBase searchCriteria)
         {
-            var preference = ChineseMediaPreferenceEvaluator.Evaluate(subject);
+            var preference = ChineseMediaPreferenceEvaluator.Evaluate(subject, _audioLanguageMappingService);
 
             if (searchCriteria?.InteractiveSearch == true && preference.IsMediaInfoPending)
             {
@@ -38,10 +41,12 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
 
     public class ChineseMediaAvailabilitySpecification : IDownloadDecisionEngineSpecification
     {
+        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
         private readonly Logger _logger;
 
-        public ChineseMediaAvailabilitySpecification(Logger logger)
+        public ChineseMediaAvailabilitySpecification(IAudioLanguageMappingService audioLanguageMappingService, Logger logger)
         {
+            _audioLanguageMappingService = audioLanguageMappingService;
             _logger = logger;
         }
 
@@ -50,7 +55,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
 
         public DownloadSpecDecision IsSatisfiedBy(RemoteMovie subject, SearchCriteriaBase searchCriteria)
         {
-            var preference = ChineseMediaPreferenceEvaluator.Evaluate(subject);
+            var preference = ChineseMediaPreferenceEvaluator.Evaluate(subject, _audioLanguageMappingService);
 
             if (preference.HasChineseAudioOrSubtitle || preference.IsMediaInfoPending)
             {
