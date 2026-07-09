@@ -61,13 +61,28 @@ namespace NzbDrone.Core.Movies
             .LeftJoin<Movie, MovieFile>((m, f) => m.Id == f.MovieId)
             .LeftJoin<MovieMetadata, AlternativeTitle>((mm, t) => mm.Id == t.MovieMetadataId);
 
-        private Movie Map(Dictionary<int, Movie> dict, Movie movie, MovieMetadata metadata, QualityProfile qualityProfile, MovieFile movieFile, AlternativeTitle altTitle = null, MovieTranslation translation = null)
+        private Dictionary<int, QualityProfile> GetQualityProfileLookup()
+        {
+            return _profileRepository.All().ToDictionary(x => x.Id);
+        }
+
+        private QualityProfile GetQualityProfile(QualityProfile qualityProfile, Dictionary<int, QualityProfile> qualityProfiles)
+        {
+            if (qualityProfile != null && qualityProfiles.TryGetValue(qualityProfile.Id, out var profile))
+            {
+                return profile;
+            }
+
+            return qualityProfile;
+        }
+
+        private Movie Map(Dictionary<int, Movie> dict, Dictionary<int, QualityProfile> qualityProfiles, Movie movie, MovieMetadata metadata, QualityProfile qualityProfile, MovieFile movieFile, AlternativeTitle altTitle = null, MovieTranslation translation = null)
         {
             if (!dict.TryGetValue(movie.Id, out var movieEntry))
             {
                 movieEntry = movie;
                 movieEntry.MovieMetadata = metadata;
-                movieEntry.QualityProfile = qualityProfile;
+                movieEntry.QualityProfile = GetQualityProfile(qualityProfile, qualityProfiles);
                 movieEntry.MovieFile = movieFile;
                 dict.Add(movieEntry.Id, movieEntry);
             }
@@ -88,10 +103,11 @@ namespace NzbDrone.Core.Movies
         protected override List<Movie> Query(SqlBuilder builder)
         {
             var movieDictionary = new Dictionary<int, Movie>();
+            var qualityProfiles = GetQualityProfileLookup();
 
             _ = _database.QueryJoined<Movie, MovieMetadata, QualityProfile, MovieFile, AlternativeTitle>(
                 builder,
-                (movie, metadata, qualityProfile, file, altTitle) => Map(movieDictionary, movie, metadata, qualityProfile, file, altTitle));
+                (movie, metadata, qualityProfile, file, altTitle) => Map(movieDictionary, qualityProfiles, movie, metadata, qualityProfile, file, altTitle));
 
             return movieDictionary.Values.ToList();
         }
@@ -104,7 +120,7 @@ namespace NzbDrone.Core.Movies
                 .LeftJoin<Movie, MovieMetadata>((m, f) => m.MovieMetadataId == f.Id)
                 .LeftJoin<Movie, MovieFile>((m, f) => m.MovieFileId == f.Id);
 
-            var qualityProfiles = _profileRepository.All().ToDictionary(x => x.Id);
+            var qualityProfiles = GetQualityProfileLookup();
             var alternativeTitles = _alternativeTitleRepository.All()
                 .GroupBy(x => x.MovieMetadataId)
                 .ToDictionary(x => x.Key, y => y.ToList());
@@ -149,6 +165,7 @@ namespace NzbDrone.Core.Movies
         private List<Movie> FindByMovieTitles(List<string> titles)
         {
             var movieDictionary = new Dictionary<int, Movie>();
+            var qualityProfiles = GetQualityProfileLookup();
 
             var builder = new SqlBuilder(_database.DatabaseType)
                 .Join<Movie, QualityProfile>((m, p) => m.QualityProfileId == p.Id)
@@ -158,7 +175,7 @@ namespace NzbDrone.Core.Movies
 
             _ = _database.QueryJoined<Movie, MovieMetadata, QualityProfile, MovieFile>(
                 builder,
-                (movie, metadata, qualityProfile, file) => Map(movieDictionary, movie, metadata, qualityProfile, file));
+                (movie, metadata, qualityProfile, file) => Map(movieDictionary, qualityProfiles, movie, metadata, qualityProfile, file));
 
             return movieDictionary.Values.ToList();
         }
@@ -166,6 +183,7 @@ namespace NzbDrone.Core.Movies
         private List<Movie> FindByAltTitles(List<string> titles)
         {
             var movieDictionary = new Dictionary<int, Movie>();
+            var qualityProfiles = GetQualityProfileLookup();
 
             var builder = new SqlBuilder(_database.DatabaseType)
                 .Join<AlternativeTitle, MovieMetadata>((t, mm) => t.MovieMetadataId == mm.Id)
@@ -178,7 +196,7 @@ namespace NzbDrone.Core.Movies
                 builder,
                 (altTitle, qualityProfile, movie, metadata, file) =>
                 {
-                    _ = Map(movieDictionary, movie, metadata, qualityProfile, file, altTitle);
+                    _ = Map(movieDictionary, qualityProfiles, movie, metadata, qualityProfile, file, altTitle);
                     return null;
                 });
 
@@ -188,6 +206,7 @@ namespace NzbDrone.Core.Movies
         private List<Movie> FindByTransTitles(List<string> titles)
         {
             var movieDictionary = new Dictionary<int, Movie>();
+            var qualityProfiles = GetQualityProfileLookup();
 
             var builder = new SqlBuilder(_database.DatabaseType)
                 .Join<MovieTranslation, MovieMetadata>((t, mm) => t.MovieMetadataId == mm.Id)
@@ -200,7 +219,7 @@ namespace NzbDrone.Core.Movies
                 builder,
                 (trans, qualityProfile, movie, metadata, file) =>
                 {
-                    _ = Map(movieDictionary, movie, metadata, qualityProfile, file, null, trans);
+                    _ = Map(movieDictionary, qualityProfiles, movie, metadata, qualityProfile, file, null, trans);
                     return null;
                 });
 

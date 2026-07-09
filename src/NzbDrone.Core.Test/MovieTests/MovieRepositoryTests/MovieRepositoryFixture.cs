@@ -2,9 +2,11 @@ using System.Collections.Generic;
 using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Profiles;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.CustomFormats;
@@ -49,6 +51,55 @@ namespace NzbDrone.Core.Test.MovieTests.MovieRepositoryTests
             Subject.Insert(movie);
 
             Subject.All().Single().QualityProfile.Should().NotBeNull();
+        }
+
+        [Test]
+        public void should_load_quality_profile_custom_format_mutex_groups_for_movie_queries()
+        {
+            var dolbyVision = new CustomFormat { Id = 1, Name = "Dolby Vision" };
+            var hdr = new CustomFormat { Id = 2, Name = "HDR" };
+            var mutexGroup = new CustomFormatMutexGroup
+            {
+                Id = 1,
+                Name = "Brightness",
+                Enabled = true,
+                CustomFormatIds = new List<int> { dolbyVision.Id, hdr.Id }
+            };
+
+            Mocker.GetMock<ICustomFormatService>()
+                .Setup(x => x.All())
+                .Returns(new List<CustomFormat> { dolbyVision, hdr });
+
+            Mocker.GetMock<ICustomFormatMutexGroupService>()
+                .Setup(x => x.GetMany(It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(new[] { mutexGroup.Id }))))
+                .Returns(new List<CustomFormatMutexGroup> { mutexGroup });
+
+            var profile = new QualityProfile
+            {
+                Items = Qualities.QualityFixture.GetDefaultQualities(Quality.Bluray1080p, Quality.DVD, Quality.HDTV720p),
+                FormatItems = new List<ProfileFormatItem>
+                {
+                    new () { Format = dolbyVision, Score = 100 },
+                    new () { Format = hdr, Score = 50 }
+                },
+                CustomFormatMutexGroupIds = new List<int> { mutexGroup.Id },
+                MinFormatScore = 0,
+                Cutoff = Quality.Bluray1080p.Id,
+                Name = "TestProfile"
+            };
+
+            _profileRepository.Insert(profile);
+
+            var movie = Builder<Movie>.CreateNew().BuildNew();
+            movie.TmdbId = 12345;
+            movie.QualityProfileId = profile.Id;
+
+            Subject.Insert(movie);
+
+            var storedMovie = Subject.FindByTmdbId(movie.TmdbId);
+
+            storedMovie.QualityProfile.CustomFormatMutexGroups.Should().ContainSingle();
+            storedMovie.QualityProfile.CalculateCustomFormatScore(new List<CustomFormat> { dolbyVision, hdr }).Should().Be(100);
         }
     }
 }
