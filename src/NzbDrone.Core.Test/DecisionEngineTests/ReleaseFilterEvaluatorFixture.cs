@@ -179,6 +179,22 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             _evaluator.RequiresMediaInfo(titleOnlyProfile).Should().BeFalse();
         }
 
+        [Test]
+        public void should_serialize_nested_groups_without_condition_values()
+        {
+            var filter = Group("or",
+                Condition("subtitleLanguages", "contains", "Chinese"),
+                Group("or",
+                    Condition("audioInfo", "contains", "Chinese"),
+                    Condition("audioInfo", "contains", "Mandarin")));
+
+            var json = STJson.ToJson(filter);
+
+            json.Should().Contain("\"children\"");
+            json.Should().Contain("\"subtitleLanguages\"");
+            json.Should().NotContain("\"valueKind\"");
+        }
+
         private ReleaseFilterProfile GivenProfile(ReleaseFilterNode filter)
         {
             return new ReleaseFilterProfile

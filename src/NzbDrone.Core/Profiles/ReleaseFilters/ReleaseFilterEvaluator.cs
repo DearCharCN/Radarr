@@ -383,7 +383,7 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
             return audioInfo.Language.IsNotNullOrWhiteSpace() ? audioInfo.Language : audioInfo.Specification;
         }
 
-        private bool EvaluateValue(ReleaseFilterValue actual, string op, JsonElement expected)
+        private bool EvaluateValue(ReleaseFilterValue actual, string op, JsonElement? expected)
         {
             switch (NormalizeKey(op))
             {
@@ -430,7 +430,7 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
             }
         }
 
-        private bool MatchesEqual(ReleaseFilterValue actual, JsonElement expected)
+        private bool MatchesEqual(ReleaseFilterValue actual, JsonElement? expected)
         {
             if (actual.Number.HasValue && TryGetExpectedNumber(expected, out var expectedNumber))
             {
@@ -452,7 +452,7 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
             return actual.Strings.Select(NormalizeText).Any(expectedStrings.Contains);
         }
 
-        private bool MatchesContains(ReleaseFilterValue actual, JsonElement expected)
+        private bool MatchesContains(ReleaseFilterValue actual, JsonElement? expected)
         {
             var expectedStrings = GetExpectedStrings(expected).Select(NormalizeText).ToList();
 
@@ -466,7 +466,7 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                 .Any(actualString => expectedStrings.Any(actualString.Contains));
         }
 
-        private bool CompareNumber(ReleaseFilterValue actual, JsonElement expected, Func<int, bool> predicate)
+        private bool CompareNumber(ReleaseFilterValue actual, JsonElement? expected, Func<int, bool> predicate)
         {
             if (!actual.Number.HasValue || !TryGetExpectedNumber(expected, out var expectedNumber))
             {
@@ -476,26 +476,36 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
             return predicate(actual.Number.Value.CompareTo(expectedNumber));
         }
 
-        private bool TryGetExpectedNumber(JsonElement value, out double number)
+        private bool TryGetExpectedNumber(JsonElement? value, out double number)
         {
             number = 0;
 
-            switch (value.ValueKind)
+            if (!value.HasValue)
+            {
+                return false;
+            }
+
+            switch (value.Value.ValueKind)
             {
                 case JsonValueKind.Number:
-                    return value.TryGetDouble(out number);
+                    return value.Value.TryGetDouble(out number);
                 case JsonValueKind.String:
-                    return double.TryParse(value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out number);
+                    return double.TryParse(value.Value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out number);
                 default:
                     return false;
             }
         }
 
-        private bool TryGetExpectedBool(JsonElement value, out bool boolValue)
+        private bool TryGetExpectedBool(JsonElement? value, out bool boolValue)
         {
             boolValue = false;
 
-            switch (value.ValueKind)
+            if (!value.HasValue)
+            {
+                return false;
+            }
+
+            switch (value.Value.ValueKind)
             {
                 case JsonValueKind.True:
                     boolValue = true;
@@ -504,25 +514,30 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                     boolValue = false;
                     return true;
                 case JsonValueKind.String:
-                    return bool.TryParse(value.GetString(), out boolValue);
+                    return bool.TryParse(value.Value.GetString(), out boolValue);
                 default:
                     return false;
             }
         }
 
-        private List<string> GetExpectedStrings(JsonElement value)
+        private List<string> GetExpectedStrings(JsonElement? value)
         {
-            switch (value.ValueKind)
+            if (!value.HasValue)
+            {
+                return new List<string>();
+            }
+
+            switch (value.Value.ValueKind)
             {
                 case JsonValueKind.Array:
-                    return value.EnumerateArray().SelectMany(GetExpectedStrings).ToList();
+                    return value.Value.EnumerateArray().SelectMany(item => GetExpectedStrings(item)).ToList();
                 case JsonValueKind.String:
-                    return new List<string> { value.GetString() };
+                    return new List<string> { value.Value.GetString() };
                 case JsonValueKind.Number:
-                    return new List<string> { value.ToString() };
+                    return new List<string> { value.Value.ToString() };
                 case JsonValueKind.True:
                 case JsonValueKind.False:
-                    return new List<string> { value.GetBoolean().ToString() };
+                    return new List<string> { value.Value.GetBoolean().ToString() };
                 default:
                     return new List<string>();
             }
