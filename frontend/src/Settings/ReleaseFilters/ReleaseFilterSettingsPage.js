@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Alert from 'Components/Alert';
 import Card from 'Components/Card';
 import FieldSet from 'Components/FieldSet';
+import SelectInput from 'Components/Form/SelectInput';
 import Icon from 'Components/Icon';
 import Label from 'Components/Label';
 import Button from 'Components/Link/Button';
@@ -92,6 +93,17 @@ const BOOLEAN_OPERATORS = [
 
 const VALUELESS_OPERATORS = new Set(['exists', 'notExists']);
 
+const GROUP_MODE_OPTIONS = [
+  {
+    key: 'and',
+    value: 'and'
+  },
+  {
+    key: 'or',
+    value: 'or'
+  }
+];
+
 function requestJson({ url, method = 'GET', data }) {
   const ajaxOptions = {
     url,
@@ -168,11 +180,11 @@ function createConditionNode() {
   };
 }
 
-function createGroupNode() {
+function createGroupNode(children = []) {
   return {
     type: 'group',
     mode: 'and',
-    children: []
+    children
   };
 }
 
@@ -234,6 +246,36 @@ function updateNodeAtPath(node, path, updater) {
       return childIndex === index ? updateNodeAtPath(child, rest, updater) : child;
     })
   };
+}
+
+function addChildToGroup(node, path, child) {
+  return updateNodeAtPath(node, path, (group) => ({
+    ...group,
+    type: 'group',
+    children: [
+      ...(group.children || []),
+      child
+    ]
+  }));
+}
+
+function insertNodeAfterPath(node, path, child) {
+  if (!path.length) {
+    return addChildToGroup(node, path, child);
+  }
+
+  const parentPath = path.slice(0, -1);
+  const insertIndex = path[path.length - 1];
+
+  return updateNodeAtPath(node, parentPath, (parent) => {
+    const children = [...(parent.children || [])];
+    children.splice(insertIndex + 1, 0, child);
+
+    return {
+      ...parent,
+      children
+    };
+  });
 }
 
 function removeNodeAtPath(node, path) {
@@ -353,27 +395,12 @@ function CheckboxField({ label, checked, onChange }) {
   );
 }
 
-function SelectField({ label, value, children, onChange }) {
-  return (
-    <label className={styles.field}>
-      <span>{label}</span>
-      <select
-        className={styles.input}
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
-
 function FilterValueInput({ node, onChange }) {
   const field = getFieldOption(node.field);
 
   if (VALUELESS_OPERATORS.has(node.operator)) {
     return (
-      <div className={styles.valuePlaceholder}>
+      <div className={styles.compactValuePlaceholder}>
         {translate('NoValueRequired')}
       </div>
     );
@@ -381,66 +408,67 @@ function FilterValueInput({ node, onChange }) {
 
   if (field.valueType === 'boolean') {
     return (
-      <SelectField
-        label={translate('ConditionValue')}
+      <select
+        className={styles.compactInput}
         value={node.value === false || node.value === 'false' ? 'false' : 'true'}
-        onChange={(value) => onChange(value === 'true')}
+        onChange={(event) => onChange(event.target.value === 'true')}
       >
         <option value="true">{translate('Yes')}</option>
         <option value="false">{translate('No')}</option>
-      </SelectField>
+      </select>
     );
   }
 
   if (field.valueType === 'number') {
     return (
-      <label className={styles.field}>
-        <span>{translate('ConditionValue')}</span>
-        <input
-          className={styles.input}
-          type="number"
-          value={node.value ?? 0}
-          onChange={(event) => {
-            const value = Number.parseFloat(event.target.value);
-            onChange(Number.isNaN(value) ? 0 : value);
-          }}
-        />
-      </label>
+      <input
+        className={styles.compactInput}
+        type="number"
+        value={node.value ?? 0}
+        onChange={(event) => {
+          const value = Number.parseFloat(event.target.value);
+          onChange(Number.isNaN(value) ? 0 : value);
+        }}
+      />
     );
   }
 
   return (
-    <TextField
-      label={translate('ConditionValue')}
+    <input
+      className={styles.compactInput}
+      type="text"
       value={node.value}
-      onChange={onChange}
+      onChange={(event) => onChange(event.target.value)}
     />
   );
 }
 
-function FilterConditionEditor({ node, path, onNodeChange, onNodeRemove }) {
+function FilterConditionEditor({
+  node,
+  path,
+  onNodeChange,
+  onNodeRemove,
+  onAddFilterAfterPress
+}) {
   const normalizedNode = normalizeCondition(node);
   const operatorOptions = getOperatorOptions(normalizedNode.field);
+  const fieldOptions = FIELD_OPTIONS.map((field) => ({
+    key: field.key,
+    value: translate(field.label)
+  }));
+  const operatorSelectOptions = operatorOptions.map((operator) => ({
+    key: operator.key,
+    value: translate(operator.label)
+  }));
 
   return (
-    <div className={styles.conditionCard}>
-      <div className={styles.conditionHeader}>
-        <span>{translate('Condition')}</span>
-
-        <IconButton
-          aria-label={translate('Delete')}
-          title={translate('Delete')}
-          name={icons.DELETE}
-          size={12}
-          onPress={() => onNodeRemove(path)}
-        />
-      </div>
-
-      <div className={styles.conditionGrid}>
-        <SelectField
-          label={translate('ConditionField')}
+    <div className={styles.filterRow}>
+      <div className={styles.inputContainer}>
+        <SelectInput
+          name="field"
           value={normalizedNode.field}
-          onChange={(field) => {
+          values={fieldOptions}
+          onChange={({ value: field }) => {
             const nextOperators = getOperatorOptions(field);
             const nextOperator = nextOperators.some((option) => option.key === normalizedNode.operator) ?
               normalizedNode.operator :
@@ -452,31 +480,24 @@ function FilterConditionEditor({ node, path, onNodeChange, onNodeRemove }) {
               operator: nextOperator
             });
           }}
-        >
-          {FIELD_OPTIONS.map((field) => (
-            <option key={field.key} value={field.key}>
-              {translate(field.label)}
-            </option>
-          ))}
-        </SelectField>
+        />
+      </div>
 
-        <SelectField
-          label={translate('ConditionOperator')}
+      <div className={styles.inputContainer}>
+        <SelectInput
+          name="operator"
           value={normalizedNode.operator}
-          onChange={(operator) => {
+          values={operatorSelectOptions}
+          onChange={({ value: operator }) => {
             onNodeChange(path, {
               ...normalizedNode,
               operator
             });
           }}
-        >
-          {operatorOptions.map((operator) => (
-            <option key={operator.key} value={operator.key}>
-              {translate(operator.label)}
-            </option>
-          ))}
-        </SelectField>
+        />
+      </div>
 
+      <div className={styles.valueInputContainer}>
         <FilterValueInput
           node={normalizedNode}
           onChange={(value) => {
@@ -487,78 +508,91 @@ function FilterConditionEditor({ node, path, onNodeChange, onNodeRemove }) {
           }}
         />
       </div>
+
+      <div className={styles.actionsContainer}>
+        <IconButton
+          title={translate('Delete')}
+          name={icons.SUBTRACT}
+          onPress={() => onNodeRemove(path)}
+        />
+
+        <IconButton
+          title={translate('AddFilterCondition')}
+          name={icons.ADD}
+          onPress={() => onAddFilterAfterPress(path)}
+        />
+      </div>
     </div>
   );
 }
 
-function FilterGroupEditor({ node, path, onNodeChange, onNodeRemove }) {
+function FilterGroupEditor({
+  node,
+  path,
+  isRoot,
+  onNodeChange,
+  onNodeRemove,
+  onAddFilterToGroupPress,
+  onAddGroupToGroupPress,
+  onAddFilterAfterPress
+}) {
   const children = node.children || [];
-  const isRoot = path.length === 0;
-
-  function updateGroup(nextGroup) {
-    onNodeChange(path, nextGroup);
-  }
-
-  function addChild(child) {
-    updateGroup({
-      ...node,
-      type: 'group',
-      children: [...children, child]
-    });
-  }
 
   return (
-    <div className={isRoot ? styles.rootGroup : styles.groupCard}>
-      <div className={styles.groupHeader}>
-        <div className={styles.groupControls}>
-          <SelectField
-            label={translate('FilterMode')}
+    <div className={isRoot ? styles.rootFilterGroup : styles.filterGroup}>
+      <div className={styles.filterGroupHeader}>
+        <div className={styles.combinatorContainer}>
+          <SelectInput
+            name="mode"
             value={node.mode || 'and'}
-            onChange={(mode) => {
-              updateGroup({
+            values={GROUP_MODE_OPTIONS}
+            onChange={({ value: mode }) => {
+              onNodeChange(path, {
                 ...node,
                 type: 'group',
                 mode
               });
             }}
-          >
-            <option value="and">{translate('MatchAll')}</option>
-            <option value="or">{translate('MatchAny')}</option>
-          </SelectField>
+          />
         </div>
 
-        {isRoot ? null : (
+        <div className={styles.groupActionsContainer}>
           <IconButton
-            aria-label={translate('Delete')}
-            title={translate('Delete')}
-            name={icons.DELETE}
-            size={12}
-            onPress={() => onNodeRemove(path)}
+            title={translate('AddFilterCondition')}
+            name={icons.ADD}
+            onPress={() => onAddFilterToGroupPress(path)}
           />
-        )}
+
+          <IconButton
+            title={translate('AddFilterGroup')}
+            name={icons.GROUP}
+            onPress={() => onAddGroupToGroupPress(path)}
+          />
+
+          {isRoot ? null : (
+            <IconButton
+              title={translate('Delete')}
+              name={icons.SUBTRACT}
+              onPress={() => onNodeRemove(path)}
+            />
+          )}
+        </div>
       </div>
 
-      <div className={styles.groupActions}>
-        <Button size="small" onPress={() => addChild(createConditionNode())}>
-          {translate('AddFilterCondition')}
-        </Button>
-
-        <Button size="small" onPress={() => addChild(createGroupNode())}>
-          {translate('AddFilterGroup')}
-        </Button>
-      </div>
-
-      <div className={styles.childList}>
+      <div className={styles.filterGroupChildren}>
         {children.length ? children.map((child, index) => (
           <FilterNodeEditor
-            key={index}
+            key={`${child.type || 'condition'}-${path.concat(index).join('.')}`}
             node={child}
             path={[...path, index]}
             onNodeChange={onNodeChange}
             onNodeRemove={onNodeRemove}
+            onAddFilterToGroupPress={onAddFilterToGroupPress}
+            onAddGroupToGroupPress={onAddGroupToGroupPress}
+            onAddFilterAfterPress={onAddFilterAfterPress}
           />
         )) : (
-          <div className={styles.emptyState}>
+          <div className={styles.emptyFilterGroup}>
             {translate('NoFilterConditions')}
           </div>
         )}
@@ -567,14 +601,26 @@ function FilterGroupEditor({ node, path, onNodeChange, onNodeRemove }) {
   );
 }
 
-function FilterNodeEditor({ node, path, onNodeChange, onNodeRemove }) {
+function FilterNodeEditor({
+  node,
+  path,
+  onNodeChange,
+  onNodeRemove,
+  onAddFilterToGroupPress,
+  onAddGroupToGroupPress,
+  onAddFilterAfterPress
+}) {
   if (node.type === 'group') {
     return (
       <FilterGroupEditor
         node={node}
         path={path}
+        isRoot={path.length === 0}
         onNodeChange={onNodeChange}
         onNodeRemove={onNodeRemove}
+        onAddFilterToGroupPress={onAddFilterToGroupPress}
+        onAddGroupToGroupPress={onAddGroupToGroupPress}
+        onAddFilterAfterPress={onAddFilterAfterPress}
       />
     );
   }
@@ -585,6 +631,7 @@ function FilterNodeEditor({ node, path, onNodeChange, onNodeRemove }) {
       path={path}
       onNodeChange={onNodeChange}
       onNodeRemove={onNodeRemove}
+      onAddFilterAfterPress={onAddFilterAfterPress}
     />
   );
 }
@@ -610,6 +657,39 @@ function EditProfileModal({
     setDraft((current) => ({
       ...current,
       filter: removeNodeAtPath(current.filter || cloneFilterNode(DEFAULT_FILTER), path)
+    }));
+  }, [setDraft]);
+
+  const addFilterToGroup = useCallback((path) => {
+    setDraft((current) => ({
+      ...current,
+      filter: addChildToGroup(
+        current.filter || cloneFilterNode(DEFAULT_FILTER),
+        path,
+        createConditionNode()
+      )
+    }));
+  }, [setDraft]);
+
+  const addGroupToGroup = useCallback((path) => {
+    setDraft((current) => ({
+      ...current,
+      filter: addChildToGroup(
+        current.filter || cloneFilterNode(DEFAULT_FILTER),
+        path,
+        createGroupNode([createConditionNode()])
+      )
+    }));
+  }, [setDraft]);
+
+  const addFilterAfter = useCallback((path) => {
+    setDraft((current) => ({
+      ...current,
+      filter: insertNodeAfterPath(
+        current.filter || cloneFilterNode(DEFAULT_FILTER),
+        path,
+        createConditionNode()
+      )
     }));
   }, [setDraft]);
 
@@ -651,14 +731,19 @@ function EditProfileModal({
             }}
           />
 
-          <FieldSet legend={translate('Filter')}>
+          <div className={styles.filterSectionLabel}>{translate('Filters')}</div>
+
+          <div className={styles.filterRows}>
             <FilterNodeEditor
               node={draft.filter || cloneFilterNode(DEFAULT_FILTER)}
               path={[]}
               onNodeChange={updateFilterNode}
               onNodeRemove={removeFilterNode}
+              onAddFilterToGroupPress={addFilterToGroup}
+              onAddGroupToGroupPress={addGroupToGroup}
+              onAddFilterAfterPress={addFilterAfter}
             />
-          </FieldSet>
+          </div>
         </ModalBody>
 
         <ModalFooter>
