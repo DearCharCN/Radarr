@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Alert from 'Components/Alert';
+import Card from 'Components/Card';
 import FieldSet from 'Components/FieldSet';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
@@ -24,8 +25,7 @@ import styles from './ReleaseScoringSettingsPage.css';
 const ENDPOINTS = {
   languageMapping: '/audiolanguagemapping',
   audioScoreProfile: '/audioscoreprofile',
-  languagePreference: '/audiolanguagepreference',
-  customFormatMutexGroup: '/customformatmutexgroup'
+  languagePreference: '/audiolanguagepreference'
 };
 
 const MATCH_TYPES = [
@@ -72,17 +72,6 @@ function getErrorMessage(xhr, fallback) {
   }
 
   return response?.message || response?.error || xhr?.statusText || fallback;
-}
-
-function splitList(value) {
-  return `${value || ''}`
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function joinList(value) {
-  return (value || []).join('\n');
 }
 
 function getLanguageName(language) {
@@ -211,15 +200,6 @@ function createDefaultLanguagePreference(audioScoreProfiles) {
   };
 }
 
-function createDefaultCustomFormatMutexGroup() {
-  return {
-    id: 0,
-    name: translate('DefaultCustomFormatMutexGroupName'),
-    enabled: true,
-    customFormatIds: []
-  };
-}
-
 function cloneLanguageMapping(item) {
   return {
     ...item,
@@ -240,13 +220,6 @@ function cloneLanguagePreference(item) {
   return {
     ...item,
     entries: (item.entries || []).map((entry) => ({ ...entry }))
-  };
-}
-
-function cloneCustomFormatMutexGroup(item) {
-  return {
-    ...item,
-    customFormatIds: [...(item.customFormatIds || [])]
   };
 }
 
@@ -346,19 +319,6 @@ function SelectField({ label, value, children, onChange }) {
   );
 }
 
-function TextAreaField({ label, value, onChange }) {
-  return (
-    <label className={styles.field}>
-      <span>{label}</span>
-      <textarea
-        className={styles.textArea}
-        value={value || ''}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
 function CheckboxField({ label, checked, onChange }) {
   return (
     <label className={styles.checkboxField}>
@@ -373,7 +333,7 @@ function CheckboxField({ label, checked, onChange }) {
 }
 
 function LanguageMappingForm({ draft, languages, setDraft }) {
-  const aliasesValue = useMemo(() => joinList(draft.aliases), [draft.aliases]);
+  const aliases = draft.aliases || [];
 
   return (
     <>
@@ -397,16 +357,56 @@ function LanguageMappingForm({ draft, languages, setDraft }) {
         </SelectField>
       </div>
 
-      <TextAreaField
-        label={translate('AudioLanguageAliases')}
-        value={aliasesValue}
-        onChange={(value) => {
-          setDraft((current) => ({
-            ...current,
-            aliases: splitList(value)
-          }));
-        }}
-      />
+      <div className={styles.arrayHeader}>
+        <h3>{translate('AudioLanguageAliases')}</h3>
+        <Button
+          size="small"
+          onPress={() => {
+            setDraft((current) => ({
+              ...current,
+              aliases: [...(current.aliases || []), '']
+            }));
+          }}
+        >
+          {translate('Add')}
+        </Button>
+      </div>
+
+      <div className={styles.inputList}>
+        {aliases.map((alias, index) => (
+          <div key={index} className={styles.inputListItem}>
+            <input
+              className={styles.input}
+              type="text"
+              value={alias || ''}
+              onChange={(event) => {
+                setDraft((current) => {
+                  const nextAliases = [...(current.aliases || [])];
+                  nextAliases[index] = event.target.value;
+
+                  return {
+                    ...current,
+                    aliases: nextAliases
+                  };
+                });
+              }}
+            />
+
+            <IconButton
+              aria-label={translate('Delete')}
+              title={translate('Delete')}
+              name={icons.DELETE}
+              size={12}
+              onPress={() => {
+                setDraft((current) => ({
+                  ...current,
+                  aliases: (current.aliases || []).filter((_, aliasIndex) => aliasIndex !== index)
+                }));
+              }}
+            />
+          </div>
+        ))}
+      </div>
 
       <CheckboxField
         label={translate('Enabled')}
@@ -425,6 +425,11 @@ function LanguageMappingForm({ draft, languages, setDraft }) {
 function AudioScoreProfileForm({ draft, setDraft }) {
   const mutexGroups = draft.mutexGroups || [];
   const rules = draft.rules || [];
+  const mutexGroupNames = Array.from(new Set(
+    mutexGroups
+      .map((group) => `${group.name || ''}`.trim())
+      .filter(Boolean)
+  ));
 
   function updateRule(index, field, value) {
     setDraft((current) => {
@@ -564,12 +569,27 @@ function AudioScoreProfileForm({ draft, setDraft }) {
                   />
                 </td>
                 <td>
-                  <input
+                  <select
                     className={styles.compactInput}
-                    type="text"
                     value={rule.mutexGroup || ''}
                     onChange={(event) => updateRule(index, 'mutexGroup', event.target.value)}
-                  />
+                  >
+                    <option value="">{translate('None')}</option>
+                    {
+                      [
+                        ...(
+                          rule.mutexGroup && !mutexGroupNames.includes(rule.mutexGroup) ?
+                            [rule.mutexGroup] :
+                            []
+                        ),
+                        ...mutexGroupNames
+                      ].map((groupName) => (
+                        <option key={groupName} value={groupName}>
+                          {groupName}
+                        </option>
+                      ))
+                    }
+                  </select>
                 </td>
                 <td className={styles.checkboxCell}>
                   <input
@@ -600,8 +620,47 @@ function AudioScoreProfileForm({ draft, setDraft }) {
 
       <div className={styles.arrayHeader}>
         <h3>{translate('AudioScoreMutexGroups')}</h3>
-        <Button
-          size="small"
+      </div>
+
+      <div className={styles.cardGrid}>
+        {mutexGroups.map((group, index) => (
+          <Card key={index} className={styles.editableCard}>
+            <div className={styles.editableCardHeader}>
+              <input
+                className={styles.cardInput}
+                type="text"
+                value={group.name || ''}
+                placeholder={translate('Name')}
+                onChange={(event) => updateMutexGroup(index, 'name', event.target.value)}
+              />
+
+              <IconButton
+                aria-label={translate('Delete')}
+                title={translate('Delete')}
+                name={icons.DELETE}
+                size={12}
+                onPress={() => {
+                  setDraft((current) => ({
+                    ...current,
+                    mutexGroups: (current.mutexGroups || []).filter((_, groupIndex) => groupIndex !== index)
+                  }));
+                }}
+              />
+            </div>
+
+            <label className={styles.cardCheckbox}>
+              <input
+                type="checkbox"
+                checked={!!group.enabled}
+                onChange={(event) => updateMutexGroup(index, 'enabled', event.target.checked)}
+              />
+              <span>{translate('Enabled')}</span>
+            </label>
+          </Card>
+        ))}
+
+        <Card
+          className={styles.addCard}
           onPress={() => {
             setDraft((current) => ({
               ...current,
@@ -615,55 +674,13 @@ function AudioScoreProfileForm({ draft, setDraft }) {
             }));
           }}
         >
-          {translate('Add')}
-        </Button>
-      </div>
-
-      <div className={styles.formTableScroller}>
-        <table className={styles.formTable}>
-          <thead>
-            <tr>
-              <th>{translate('Name')}</th>
-              <th>{translate('Enabled')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {mutexGroups.map((group, index) => (
-              <tr key={index}>
-                <td>
-                  <input
-                    className={styles.compactInput}
-                    type="text"
-                    value={group.name || ''}
-                    onChange={(event) => updateMutexGroup(index, 'name', event.target.value)}
-                  />
-                </td>
-                <td className={styles.checkboxCell}>
-                  <input
-                    type="checkbox"
-                    checked={!!group.enabled}
-                    onChange={(event) => updateMutexGroup(index, 'enabled', event.target.checked)}
-                  />
-                </td>
-                <td className={styles.rowButtonCell}>
-                  <IconButton
-                    aria-label={translate('Delete')}
-                    title={translate('Delete')}
-                    name={icons.DELETE}
-                    size={12}
-                    onPress={() => {
-                      setDraft((current) => ({
-                        ...current,
-                        mutexGroups: (current.mutexGroups || []).filter((_, groupIndex) => groupIndex !== index)
-                      }));
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <div className={styles.center}>
+            <Icon
+              name={icons.ADD}
+              size={45}
+            />
+          </div>
+        </Card>
       </div>
     </>
   );
@@ -813,69 +830,11 @@ function LanguagePreferenceForm({ draft, audioScoreProfiles, setDraft }) {
   );
 }
 
-function CustomFormatMutexGroupForm({ draft, customFormats, setDraft }) {
-  const selectedIds = draft.customFormatIds || [];
-
-  return (
-    <>
-      <div className={styles.formGrid}>
-        <TextField
-          label={translate('Name')}
-          value={draft.name}
-          onChange={(value) => {
-            setDraft((current) => ({
-              ...current,
-              name: value
-            }));
-          }}
-        />
-      </div>
-
-      <CheckboxField
-        label={translate('Enabled')}
-        checked={draft.enabled}
-        onChange={(value) => {
-          setDraft((current) => ({
-            ...current,
-            enabled: value
-          }));
-        }}
-      />
-
-      <div className={styles.checkboxList}>
-        {customFormats.map((format) => (
-          <label key={format.id} className={styles.checkboxListItem}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(format.id)}
-              onChange={(event) => {
-                setDraft((current) => {
-                  const currentIds = current.customFormatIds || [];
-                  const nextIds = event.target.checked ?
-                    [...currentIds, format.id] :
-                    currentIds.filter((id) => id !== format.id);
-
-                  return {
-                    ...current,
-                    customFormatIds: nextIds
-                  };
-                });
-              }}
-            />
-            <span>{format.name}</span>
-          </label>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function EditConfigModal({
   type,
   draft,
   languages,
   audioScoreProfiles,
-  customFormats,
   isSaving,
   saveError,
   setDraft,
@@ -915,15 +874,6 @@ function EditConfigModal({
         setDraft={setDraft}
       />
     );
-  } else if (type === 'customFormatMutexGroup') {
-    title = draft.id ? translate('EditCustomFormatMutexGroup') : translate('AddCustomFormatMutexGroup');
-    body = (
-      <CustomFormatMutexGroupForm
-        draft={draft}
-        customFormats={customFormats}
-        setDraft={setDraft}
-      />
-    );
   }
 
   return (
@@ -958,11 +908,9 @@ function ReleaseScoringSettingsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [languages, setLanguages] = useState([]);
-  const [customFormats, setCustomFormats] = useState([]);
   const [languageMappings, setLanguageMappings] = useState([]);
   const [audioScoreProfiles, setAudioScoreProfiles] = useState([]);
   const [languagePreferences, setLanguagePreferences] = useState([]);
-  const [customFormatMutexGroups, setCustomFormatMutexGroups] = useState([]);
   const [modalType, setModalType] = useState(null);
   const [draft, setDraft] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -977,13 +925,6 @@ function ReleaseScoringSettingsPage() {
     }, {});
   }, [audioScoreProfiles]);
 
-  const customFormatNames = useMemo(() => {
-    return customFormats.reduce((acc, customFormat) => {
-      acc[customFormat.id] = customFormat.name;
-      return acc;
-    }, {});
-  }, [customFormats]);
-
   const loadData = useCallback(async() => {
     setIsFetching(true);
     setLoadError(null);
@@ -991,28 +932,22 @@ function ReleaseScoringSettingsPage() {
     try {
       const [
         languageItems,
-        customFormatItems,
         mappingItems,
         audioScoreItems,
-        preferenceItems,
-        customFormatMutexItems
+        preferenceItems
       ] = await Promise.all([
         requestJson({ url: '/language' }),
-        requestJson({ url: '/customformat' }),
         requestJson({ url: ENDPOINTS.languageMapping }),
         requestJson({ url: ENDPOINTS.audioScoreProfile }),
-        requestJson({ url: ENDPOINTS.languagePreference }),
-        requestJson({ url: ENDPOINTS.customFormatMutexGroup })
+        requestJson({ url: ENDPOINTS.languagePreference })
       ]);
 
       setLanguages(languageItems || []);
-      setCustomFormats(customFormatItems || []);
       setLanguageMappings(mappingItems || []);
       setAudioScoreProfiles(audioScoreItems || []);
       setLanguagePreferences(preferenceItems || []);
-      setCustomFormatMutexGroups(customFormatMutexItems || []);
     } catch (error) {
-      setLoadError(getErrorMessage(error, translate('ReleaseScoringLoadError')));
+      setLoadError(getErrorMessage(error, translate('AudioFormatsLoadError')));
     } finally {
       setIsFetching(false);
     }
@@ -1033,8 +968,6 @@ function ReleaseScoringSettingsPage() {
         setDraft(cloneAudioScoreProfile(item));
       } else if (type === 'languagePreference') {
         setDraft(cloneLanguagePreference(item));
-      } else if (type === 'customFormatMutexGroup') {
-        setDraft(cloneCustomFormatMutexGroup(item));
       }
 
       return;
@@ -1046,8 +979,6 @@ function ReleaseScoringSettingsPage() {
       setDraft(createDefaultAudioScoreProfile());
     } else if (type === 'languagePreference') {
       setDraft(createDefaultLanguagePreference(audioScoreProfiles));
-    } else if (type === 'customFormatMutexGroup') {
-      setDraft(createDefaultCustomFormatMutexGroup());
     }
   }
 
@@ -1074,18 +1005,24 @@ function ReleaseScoringSettingsPage() {
       const id = draft.id;
       const method = id ? 'PUT' : 'POST';
       const url = id ? `${endpoint}/${id}` : endpoint;
+      const data = modalType === 'languageMapping' ? {
+        ...draft,
+        aliases: (draft.aliases || [])
+          .map((alias) => `${alias || ''}`.trim())
+          .filter(Boolean)
+      } : draft;
 
       await requestJson({
         url,
         method,
-        data: draft
+        data
       });
 
       setModalType(null);
       setDraft(null);
       await loadData();
     } catch (error) {
-      setSaveError(getErrorMessage(error, translate('ReleaseScoringSaveError')));
+      setSaveError(getErrorMessage(error, translate('AudioFormatsSaveError')));
     } finally {
       setIsSaving(false);
     }
@@ -1107,7 +1044,7 @@ function ReleaseScoringSettingsPage() {
       setDeleteTarget(null);
       await loadData();
     } catch (error) {
-      setLoadError(getErrorMessage(error, translate('ReleaseScoringDeleteError')));
+      setLoadError(getErrorMessage(error, translate('AudioFormatsDeleteError')));
     } finally {
       setIsDeleting(false);
     }
@@ -1122,7 +1059,7 @@ function ReleaseScoringSettingsPage() {
     translate('SelectedItem');
 
   return (
-    <PageContent title={translate('ReleaseScoringSettings')}>
+    <PageContent title={translate('AudioFormatsSettings')}>
       <SettingsToolbar showSave={false} hasPendingChanges={false} />
 
       <PageContentBody>
@@ -1252,48 +1189,6 @@ function ReleaseScoringSettingsPage() {
               )}
             </ConfigSection>
 
-            <ConfigSection
-              legend={translate('CustomFormatMutexGroups')}
-              addLabel={translate('AddCustomFormatMutexGroup')}
-              onAddPress={() => openModal('customFormatMutexGroup')}
-            >
-              {customFormatMutexGroups.length ? (
-                <div className={styles.tableScroller}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>{translate('Name')}</th>
-                        <th>{translate('CustomFormats')}</th>
-                        <th>{translate('Status')}</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customFormatMutexGroups.map((group) => (
-                        <tr key={group.id}>
-                          <td className={styles.nameCell}>{group.name}</td>
-                          <td>
-                            {(group.customFormatIds || [])
-                              .map((id) => customFormatNames[id])
-                              .filter(Boolean)
-                              .join(', ') || translate('None')}
-                          </td>
-                          <td>{group.enabled ? translate('Enabled') : translate('Disabled')}</td>
-                          <td className={styles.actionsCell}>
-                            <ActionButtons
-                              onEditPress={() => openModal('customFormatMutexGroup', group)}
-                              onDeletePress={() => setDeleteTarget({ type: 'customFormatMutexGroup', item: group })}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState>{translate('NoCustomFormatMutexGroups')}</EmptyState>
-              )}
-            </ConfigSection>
           </>
         )}
 
@@ -1302,7 +1197,6 @@ function ReleaseScoringSettingsPage() {
           draft={draft}
           languages={languages}
           audioScoreProfiles={audioScoreProfiles}
-          customFormats={customFormats}
           isSaving={isSaving}
           saveError={saveError}
           setDraft={setDraft}
@@ -1314,7 +1208,7 @@ function ReleaseScoringSettingsPage() {
           isOpen={!!deleteTarget}
           kind="danger"
           title={translate('Delete')}
-          message={translate('DeleteReleaseScoringConfigMessage', { name: deleteName })}
+          message={translate('DeleteAudioFormatsConfigMessage', { name: deleteName })}
           confirmLabel={translate('Delete')}
           cancelLabel={translate('Cancel')}
           isSpinning={isDeleting}

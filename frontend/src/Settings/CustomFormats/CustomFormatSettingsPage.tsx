@@ -7,6 +7,7 @@ import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import ParseToolbarButton from 'Parse/ParseToolbarButton';
 import SettingsToolbar from 'Settings/SettingsToolbar';
 import translate from 'Utilities/String/translate';
+import CustomFormatMutexGroups from './CustomFormatMutexGroups/CustomFormatMutexGroups';
 import CustomFormatsConnector from './CustomFormats/CustomFormatsConnector';
 import ManageCustomFormatsToolbarButton from './CustomFormats/Manage/ManageCustomFormatsToolbarButton';
 
@@ -35,6 +36,8 @@ function CustomFormatSettingsPage() {
           {/* @ts-ignore */}
           <CustomFormatsConnector />
         </DndProvider>
+
+        <CustomFormatMutexGroups />
       </PageContentBody>
     </PageContent>
   );

@@ -22,7 +22,7 @@ import MetadataSettings from 'Settings/Metadata/MetadataSettings';
 import NotificationSettings from 'Settings/Notifications/NotificationSettings';
 import Profiles from 'Settings/Profiles/Profiles';
 import QualityConnector from 'Settings/Quality/QualityConnector';
-import ReleaseScoringSettingsPage from 'Settings/ReleaseScoring/ReleaseScoringSettingsPage';
+import AudioFormatsSettingsPage from 'Settings/ReleaseScoring/ReleaseScoringSettingsPage';
 import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
 import UISettingsConnector from 'Settings/UI/UISettingsConnector';
@@ -38,6 +38,10 @@ import Missing from 'Wanted/Missing/Missing';
 
 function RedirectWithUrlBase() {
   return <Redirect to={getPathWithUrlBase('/')} />;
+}
+
+function RedirectToAudioFormatsSettings() {
+  return <Redirect to={getPathWithUrlBase('/settings/audioformats')} />;
 }
 
 function AppRoutes() {
@@ -112,8 +116,13 @@ function AppRoutes() {
       />
 
       <Route
+        path="/settings/audioformats"
+        component={AudioFormatsSettingsPage}
+      />
+
+      <Route
         path="/settings/releasescoring"
-        component={ReleaseScoringSettingsPage}
+        component={RedirectToAudioFormatsSettings}
       />
 
       <Route path="/settings/indexers" component={IndexerSettings} />

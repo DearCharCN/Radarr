@@ -134,8 +134,8 @@ const LINKS: SidebarItem[] = [
         to: '/settings/customformats',
       },
       {
-        title: () => translate('ReleaseScoring'),
-        to: '/settings/releasescoring',
+        title: () => translate('AudioFormats'),
+        to: '/settings/audioformats',
       },
       {
         title: () => translate('Indexers'),

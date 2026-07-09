@@ -3,19 +3,28 @@
 interface CssExports {
   'actions': string;
   'actionsCell': string;
+  'addCard': string;
   'arrayHeader': string;
   'buttonContent': string;
+  'cardCheckbox': string;
+  'cardGrid': string;
+  'cardInput': string;
+  'center': string;
   'checkboxCell': string;
   'checkboxField': string;
   'checkboxList': string;
   'checkboxListItem': string;
   'compactInput': string;
+  'editableCard': string;
+  'editableCardHeader': string;
   'emptyState': string;
   'field': string;
   'formGrid': string;
   'formTable': string;
   'formTableScroller': string;
   'input': string;
+  'inputList': string;
+  'inputListItem': string;
   'nameCell': string;
   'rowButtonCell': string;
   'scoreInput': string;

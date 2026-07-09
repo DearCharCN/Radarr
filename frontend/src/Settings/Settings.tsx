@@ -44,12 +44,12 @@ function Settings() {
           {translate('CustomFormatsSettingsSummary')}
         </div>
 
-        <Link className={styles.link} to="/settings/releasescoring">
-          {translate('ReleaseScoring')}
+        <Link className={styles.link} to="/settings/audioformats">
+          {translate('AudioFormats')}
         </Link>
 
         <div className={styles.summary}>
-          {translate('ReleaseScoringSettingsSummary')}
+          {translate('AudioFormatsSettingsSummary')}
         </div>
 
         <Link className={styles.link} to="/settings/indexers">
