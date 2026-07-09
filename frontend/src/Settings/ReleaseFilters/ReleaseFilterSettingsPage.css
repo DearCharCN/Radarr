@@ -1,0 +1,159 @@
+.cardGrid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -10px 12px;
+}
+
+.configCard {
+  composes: card from '~Components/Card.css';
+
+  width: 300px;
+  min-height: 88px;
+}
+
+.addCard {
+  composes: card from '~Components/Card.css';
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 300px;
+  min-height: 88px;
+  background-color: var(--cardAlternateBackgroundColor);
+  color: var(--gray);
+  text-align: center;
+  font-size: 45px;
+}
+
+.center {
+  display: inline-block;
+  padding: 5px 20px 0;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  background-color: var(--cardCenterBackgroundColor);
+}
+
+.cardTitleContainer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTitle {
+  @add-mixin truncate;
+
+  margin-bottom: 20px;
+  font-weight: 300;
+  font-size: 24px;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  pointer-events: all;
+}
+
+.label {
+  @add-mixin truncate;
+  composes: label from '~Components/Label.css';
+
+  max-width: 100%;
+}
+
+.emptyState {
+  padding: 16px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  color: var(--helpTextColor);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-weight: bold;
+}
+
+.input {
+  composes: input from '~Components/Form/Input.css';
+}
+
+.checkboxField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-weight: bold;
+}
+
+.rootGroup {
+  display: grid;
+  gap: 12px;
+}
+
+.groupCard,
+.conditionCard {
+  padding: 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  background-color: var(--cardAlternateBackgroundColor);
+}
+
+.groupHeader,
+.conditionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.groupControls {
+  width: min(100%, 260px);
+}
+
+.groupActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.childList {
+  display: grid;
+  gap: 10px;
+}
+
+.conditionHeader {
+  align-items: center;
+  color: var(--helpTextColor);
+  font-weight: bold;
+}
+
+.conditionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.valuePlaceholder {
+  display: flex;
+  align-items: end;
+  min-height: 58px;
+  color: var(--helpTextColor);
+}

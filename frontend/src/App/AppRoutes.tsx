@@ -22,6 +22,7 @@ import MetadataSettings from 'Settings/Metadata/MetadataSettings';
 import NotificationSettings from 'Settings/Notifications/NotificationSettings';
 import Profiles from 'Settings/Profiles/Profiles';
 import QualityConnector from 'Settings/Quality/QualityConnector';
+import ReleaseFilterSettingsPage from 'Settings/ReleaseFilters/ReleaseFilterSettingsPage';
 import AudioFormatsSettingsPage from 'Settings/ReleaseScoring/ReleaseScoringSettingsPage';
 import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
@@ -119,6 +120,8 @@ function AppRoutes() {
         path="/settings/audioformats"
         component={AudioFormatsSettingsPage}
       />
+
+      <Route path="/settings/filters" component={ReleaseFilterSettingsPage} />
 
       <Route
         path="/settings/releasescoring"

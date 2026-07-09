@@ -52,6 +52,14 @@ function Settings() {
           {translate('AudioFormatsSettingsSummary')}
         </div>
 
+        <Link className={styles.link} to="/settings/filters">
+          {translate('Filters')}
+        </Link>
+
+        <div className={styles.summary}>
+          {translate('FiltersSettingsSummary')}
+        </div>
+
         <Link className={styles.link} to="/settings/indexers">
           {translate('Indexers')}
         </Link>

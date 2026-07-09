@@ -138,6 +138,10 @@ const LINKS: SidebarItem[] = [
         to: '/settings/audioformats',
       },
       {
+        title: () => translate('Filters'),
+        to: '/settings/filters',
+      },
+      {
         title: () => translate('Indexers'),
         to: '/settings/indexers',
       },

@@ -35,6 +35,8 @@ const MATCH_TYPES = [
   { key: 'regex', value: 'Regex' }
 ];
 
+const ORIGIN_LANGUAGE_TAG = 'Origin';
+
 function requestJson({ url, method = 'GET', data }) {
   const ajaxOptions = {
     url,
@@ -85,6 +87,54 @@ function getDefaultLanguage(languages) {
     languages.find((language) => language.id > 0) ||
     languages[0] || { id: 0, name: 'Unknown', nameLower: 'unknown' }
   );
+}
+
+function createLanguageTagOptions(languages, entries = []) {
+  const options = [];
+  const seen = new Set();
+  const excludedNames = new Set(['Any', 'Original', 'Unknown']);
+
+  function addOption(tag) {
+    const value = `${tag || ''}`.trim();
+
+    if (!value) {
+      return;
+    }
+
+    const key = value.toLowerCase();
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    options.push({
+      key: value,
+      value
+    });
+  }
+
+  (languages || []).forEach((language) => {
+    if (!language?.name || excludedNames.has(language.name)) {
+      return;
+    }
+
+    addOption(language.name);
+  });
+
+  addOption(ORIGIN_LANGUAGE_TAG);
+
+  entries.forEach((entry) => {
+    addOption(entry.languageTag);
+  });
+
+  return options;
+}
+
+function getDefaultLanguageTag(languageTagOptions) {
+  return languageTagOptions.find((option) => option.value === 'Chinese')?.value ||
+    languageTagOptions[0]?.value ||
+    ORIGIN_LANGUAGE_TAG;
 }
 
 function createDefaultLanguageMapping(languages) {
@@ -181,23 +231,30 @@ function createDefaultAudioScoreProfile() {
   };
 }
 
-function createDefaultLanguagePreference(audioScoreProfiles) {
+function createDefaultLanguagePreference(audioScoreProfiles, languages) {
+  const languageTagOptions = createLanguageTagOptions(languages);
+  const languageTag = getDefaultLanguageTag(languageTagOptions);
+  const entries = [
+    {
+      languageTag,
+      enabled: true
+    }
+  ];
+
+  if (languageTag.toLowerCase() !== ORIGIN_LANGUAGE_TAG.toLowerCase()) {
+    entries.push({
+      languageTag: ORIGIN_LANGUAGE_TAG,
+      enabled: true
+    });
+  }
+
   return {
     id: 0,
     name: translate('DefaultAudioLanguagePreferenceName'),
     enabled: true,
     scoreGapThreshold: 35,
     audioScoreProfileId: audioScoreProfiles[0]?.id || null,
-    entries: [
-      {
-        languageTag: 'Chinese',
-        enabled: true
-      },
-      {
-        languageTag: 'Origin',
-        enabled: true
-      }
-    ]
+    entries
   };
 }
 
@@ -982,8 +1039,9 @@ function AudioScoreProfileForm({ draft, setDraft }) {
   );
 }
 
-function LanguagePreferenceForm({ draft, audioScoreProfiles, setDraft }) {
-  const entries = draft.entries || [];
+function LanguagePreferenceForm({ draft, languages, audioScoreProfiles, setDraft }) {
+  const entries = useMemo(() => draft.entries || [], [draft.entries]);
+  const languageTagOptions = useMemo(() => createLanguageTagOptions(languages, entries), [languages, entries]);
 
   function updateEntry(index, field, value) {
     setDraft((current) => {
@@ -1060,12 +1118,14 @@ function LanguagePreferenceForm({ draft, audioScoreProfiles, setDraft }) {
         <Button
           size="small"
           onPress={() => {
+            const languageTag = getDefaultLanguageTag(languageTagOptions);
+
             setDraft((current) => ({
               ...current,
               entries: [
                 ...(current.entries || []),
                 {
-                  languageTag: '',
+                  languageTag,
                   enabled: true
                 }
               ]
@@ -1089,12 +1149,18 @@ function LanguagePreferenceForm({ draft, audioScoreProfiles, setDraft }) {
             {entries.map((entry, index) => (
               <tr key={index}>
                 <td>
-                  <input
+                  <select
                     className={styles.compactInput}
-                    type="text"
                     value={entry.languageTag || ''}
                     onChange={(event) => updateEntry(index, 'languageTag', event.target.value)}
-                  />
+                  >
+                    <option value="">{translate('SelectLanguage')}</option>
+                    {languageTagOptions.map((option) => (
+                      <option key={option.key} value={option.value}>
+                        {option.value}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className={styles.checkboxCell}>
                   <input
@@ -1166,6 +1232,7 @@ function EditConfigModal({
     body = (
       <LanguagePreferenceForm
         draft={draft}
+        languages={languages}
         audioScoreProfiles={audioScoreProfiles}
         setDraft={setDraft}
       />
@@ -1274,7 +1341,7 @@ function ReleaseScoringSettingsPage() {
     } else if (type === 'audioScoreProfile') {
       setDraft(createDefaultAudioScoreProfile());
     } else if (type === 'languagePreference') {
-      setDraft(createDefaultLanguagePreference(audioScoreProfiles));
+      setDraft(createDefaultLanguagePreference(audioScoreProfiles, languages));
     }
   }
 
