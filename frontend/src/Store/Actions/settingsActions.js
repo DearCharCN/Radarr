@@ -1,8 +1,11 @@
 import { createAction } from 'redux-actions';
 import { handleThunks } from 'Store/thunks';
 import createHandleActions from './Creators/createHandleActions';
+import audioLanguagePreferences from './Settings/audioLanguagePreferences';
+import audioScoreProfiles from './Settings/audioScoreProfiles';
 import autoTaggings from './Settings/autoTaggings';
 import autoTaggingSpecifications from './Settings/autoTaggingSpecifications';
+import customFormatMutexGroups from './Settings/customFormatMutexGroups';
 import customFormats from './Settings/customFormats';
 import customFormatSpecifications from './Settings/customFormatSpecifications';
 import delayProfiles from './Settings/delayProfiles';
@@ -24,12 +27,16 @@ import namingExamples from './Settings/namingExamples';
 import notifications from './Settings/notifications';
 import qualityDefinitions from './Settings/qualityDefinitions';
 import qualityProfiles from './Settings/qualityProfiles';
+import releaseFilterProfiles from './Settings/releaseFilterProfiles';
 import releaseProfiles from './Settings/releaseProfiles';
 import remotePathMappings from './Settings/remotePathMappings';
 import ui from './Settings/ui';
 
+export * from './Settings/audioLanguagePreferences';
+export * from './Settings/audioScoreProfiles';
 export * from './Settings/autoTaggingSpecifications';
 export * from './Settings/autoTaggings';
+export * from './Settings/customFormatMutexGroups';
 export * from './Settings/customFormatSpecifications.js';
 export * from './Settings/customFormats';
 export * from './Settings/delayProfiles';
@@ -51,6 +58,7 @@ export * from './Settings/namingExamples';
 export * from './Settings/notifications';
 export * from './Settings/qualityDefinitions';
 export * from './Settings/qualityProfiles';
+export * from './Settings/releaseFilterProfiles';
 export * from './Settings/releaseProfiles';
 export * from './Settings/remotePathMappings';
 export * from './Settings/ui';
@@ -65,8 +73,11 @@ export const section = 'settings';
 
 export const defaultState = {
   advancedSettings: false,
+  audioLanguagePreferences: audioLanguagePreferences.defaultState,
+  audioScoreProfiles: audioScoreProfiles.defaultState,
   autoTaggingSpecifications: autoTaggingSpecifications.defaultState,
   autoTaggings: autoTaggings.defaultState,
+  customFormatMutexGroups: customFormatMutexGroups.defaultState,
   customFormatSpecifications: customFormatSpecifications.defaultState,
   customFormats: customFormats.defaultState,
   delayProfiles: delayProfiles.defaultState,
@@ -88,6 +99,7 @@ export const defaultState = {
   notifications: notifications.defaultState,
   qualityDefinitions: qualityDefinitions.defaultState,
   qualityProfiles: qualityProfiles.defaultState,
+  releaseFilterProfiles: releaseFilterProfiles.defaultState,
   releaseProfiles: releaseProfiles.defaultState,
   remotePathMappings: remotePathMappings.defaultState,
   ui: ui.defaultState
@@ -112,8 +124,11 @@ export const toggleAdvancedSettings = createAction(TOGGLE_ADVANCED_SETTINGS);
 // Action Handlers
 
 export const actionHandlers = handleThunks({
+  ...audioLanguagePreferences.actionHandlers,
+  ...audioScoreProfiles.actionHandlers,
   ...autoTaggingSpecifications.actionHandlers,
   ...autoTaggings.actionHandlers,
+  ...customFormatMutexGroups.actionHandlers,
   ...customFormatSpecifications.actionHandlers,
   ...customFormats.actionHandlers,
   ...delayProfiles.actionHandlers,
@@ -135,6 +150,7 @@ export const actionHandlers = handleThunks({
   ...notifications.actionHandlers,
   ...qualityDefinitions.actionHandlers,
   ...qualityProfiles.actionHandlers,
+  ...releaseFilterProfiles.actionHandlers,
   ...releaseProfiles.actionHandlers,
   ...remotePathMappings.actionHandlers,
   ...ui.actionHandlers
@@ -150,7 +166,10 @@ export const reducers = createHandleActions({
   },
 
   ...autoTaggingSpecifications.reducers,
+  ...audioLanguagePreferences.reducers,
+  ...audioScoreProfiles.reducers,
   ...autoTaggings.reducers,
+  ...customFormatMutexGroups.reducers,
   ...customFormatSpecifications.reducers,
   ...customFormats.reducers,
   ...delayProfiles.reducers,
@@ -172,6 +191,7 @@ export const reducers = createHandleActions({
   ...notifications.reducers,
   ...qualityDefinitions.reducers,
   ...qualityProfiles.reducers,
+  ...releaseFilterProfiles.reducers,
   ...releaseProfiles.reducers,
   ...remotePathMappings.reducers,
   ...ui.reducers

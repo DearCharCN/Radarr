@@ -3,9 +3,10 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
-import { fetchQualityProfileSchema, saveQualityProfile, setQualityProfileValue } from 'Store/Actions/settingsActions';
+import { fetchAudioLanguagePreferences, fetchAudioScoreProfiles, fetchCustomFormatMutexGroups, fetchQualityProfileSchema, fetchReleaseFilterProfiles, saveQualityProfile, setQualityProfileValue } from 'Store/Actions/settingsActions';
 import createProfileInUseSelector from 'Store/Selectors/createProfileInUseSelector';
 import createProviderSettingsSelector from 'Store/Selectors/createProviderSettingsSelector';
+import translate from 'Utilities/String/translate';
 import EditQualityProfileModalContent from './EditQualityProfileModalContent';
 
 function getQualityItemGroupId(qualityProfile) {
@@ -114,18 +115,57 @@ function createLanguagesSelector() {
   );
 }
 
+function createNamedOptionsSelector(section, includeNone = true) {
+  return createSelector(
+    (state) => state.settings[section],
+    (settingsSection) => {
+      const items = settingsSection?.items || [];
+      const values = items
+        .slice()
+        .sort(sortByName)
+        .map((item) => {
+          return {
+            key: item.id,
+            value: item.name
+          };
+        });
+
+      if (includeNone) {
+        values.unshift({
+          key: 0,
+          value: translate('None')
+        });
+      }
+
+      return values;
+    }
+  );
+}
+
+function sortByName(left, right) {
+  return left.name.localeCompare(right.name);
+}
+
 function createMapStateToProps() {
   return createSelector(
     createProviderSettingsSelector('qualityProfiles'),
     createQualitiesSelector(),
     createFormatsSelector(),
     createLanguagesSelector(),
+    createNamedOptionsSelector('releaseFilterProfiles'),
+    createNamedOptionsSelector('audioLanguagePreferences'),
+    createNamedOptionsSelector('audioScoreProfiles'),
+    createNamedOptionsSelector('customFormatMutexGroups', false),
     createProfileInUseSelector('qualityProfileId'),
-    (qualityProfile, qualities, customFormats, languages, isInUse) => {
+    (qualityProfile, qualities, customFormats, languages, releaseFilterProfiles, audioLanguagePreferences, audioScoreProfiles, customFormatMutexGroups, isInUse) => {
       return {
         qualities,
         customFormats,
         languages,
+        releaseFilterProfiles,
+        audioLanguagePreferences,
+        audioScoreProfiles,
+        customFormatMutexGroups,
         ...qualityProfile,
         isInUse
       };
@@ -134,7 +174,11 @@ function createMapStateToProps() {
 }
 
 const mapDispatchToProps = {
+  fetchAudioLanguagePreferences,
+  fetchAudioScoreProfiles,
+  fetchCustomFormatMutexGroups,
   fetchQualityProfileSchema,
+  fetchReleaseFilterProfiles,
   setQualityProfileValue,
   saveQualityProfile
 };
@@ -159,6 +203,11 @@ class EditQualityProfileModalContentConnector extends Component {
     if (!this.props.id && !this.props.isPopulated) {
       this.props.fetchQualityProfileSchema();
     }
+
+    this.props.fetchReleaseFilterProfiles();
+    this.props.fetchAudioLanguagePreferences();
+    this.props.fetchAudioScoreProfiles();
+    this.props.fetchCustomFormatMutexGroups();
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -515,6 +564,10 @@ EditQualityProfileModalContentConnector.propTypes = {
   saveError: PropTypes.object,
   item: PropTypes.object.isRequired,
   languages: PropTypes.arrayOf(PropTypes.object).isRequired,
+  fetchAudioLanguagePreferences: PropTypes.func.isRequired,
+  fetchAudioScoreProfiles: PropTypes.func.isRequired,
+  fetchCustomFormatMutexGroups: PropTypes.func.isRequired,
+  fetchReleaseFilterProfiles: PropTypes.func.isRequired,
   setQualityProfileValue: PropTypes.func.isRequired,
   fetchQualityProfileSchema: PropTypes.func.isRequired,
   saveQualityProfile: PropTypes.func.isRequired,

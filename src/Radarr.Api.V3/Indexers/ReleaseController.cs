@@ -18,7 +18,7 @@ using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles.AudioLanguageMappings;
+using NzbDrone.Core.Profiles.AudioPreferences;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Validation;
 using Radarr.Http;
@@ -37,7 +37,7 @@ namespace Radarr.Api.V3.Indexers
         private readonly IDownloadService _downloadService;
         private readonly IMovieService _movieService;
         private readonly IIndexerFactory _indexerFactory;
-        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
+        private readonly IAudioLanguagePreferenceService _audioLanguagePreferenceService;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
@@ -50,7 +50,7 @@ namespace Radarr.Api.V3.Indexers
                              IDownloadService downloadService,
                              IMovieService movieService,
                              IIndexerFactory indexerFactory,
-                             IAudioLanguageMappingService audioLanguageMappingService,
+                             IAudioLanguagePreferenceService audioLanguagePreferenceService,
                              IHttpClient httpClient,
                              ICacheManager cacheManager,
                              IQualityProfileService qualityProfileService,
@@ -64,7 +64,7 @@ namespace Radarr.Api.V3.Indexers
             _downloadService = downloadService;
             _movieService = movieService;
             _indexerFactory = indexerFactory;
-            _audioLanguageMappingService = audioLanguageMappingService;
+            _audioLanguagePreferenceService = audioLanguagePreferenceService;
             _httpClient = httpClient;
             _logger = logger;
 
@@ -226,11 +226,9 @@ namespace Radarr.Api.V3.Indexers
             remoteMovie.Release.MediaInfoProgressCompleted = result.MediaInfoProgressCompleted;
             remoteMovie.Release.MediaInfoProgressTotal = result.MediaInfoProgressTotal;
             remoteMovie.Release.ProwlarrIndexerId = prowlarrIndexerId;
-            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie, _audioLanguageMappingService);
+            var audioPreference = _audioLanguagePreferenceService.Evaluate(remoteMovie);
             result.AudioInfo = remoteMovie.Release.AudioInfo;
-            result.PreferredAudioInfo = chineseMediaPreference.SelectedAudio;
-            result.AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore;
-            result.HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle;
+            ApplyAudioPreference(result, audioPreference);
             _logger.Debug("Radarr mediaInfo proxy request completed: release {0}, indexer {1}, prowlarr indexer {2}, status {3}, handle {4}, progress {5}/{6} {7}",
                 release.Guid,
                 release.IndexerId,
@@ -341,16 +339,40 @@ namespace Radarr.Api.V3.Indexers
         protected override ReleaseResource MapDecision(DownloadDecision decision, int initialWeight)
         {
             var resource = base.MapDecision(decision, initialWeight);
-            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(decision.RemoteMovie, _audioLanguageMappingService);
+            var audioPreference = _audioLanguagePreferenceService.Evaluate(decision.RemoteMovie);
 
             resource.AudioInfo = decision.RemoteMovie.Release.AudioInfo;
-            resource.PreferredAudioInfo = chineseMediaPreference.SelectedAudio;
-            resource.AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore;
-            resource.HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle;
+            ApplyAudioPreference(resource, audioPreference);
 
             _remoteMovieCache.Set(GetCacheKey(resource), decision.RemoteMovie, TimeSpan.FromMinutes(30));
 
             return resource;
+        }
+
+        private static void ApplyAudioPreference(ReleaseResource resource, AudioPreferenceResult audioPreference)
+        {
+            resource.SelectedAudioInfo = audioPreference.SelectedAudio;
+            resource.SelectedAudioLanguage = audioPreference.SelectedAudio?.MappedLanguage?.Name ?? audioPreference.SelectedAudio?.Language;
+            resource.SelectedAudioTags = audioPreference.SelectedAudio?.LanguageTags ?? new List<string>();
+            resource.AudioScore = audioPreference.AudioScore;
+            resource.AudioScoreBreakdown = audioPreference.AudioScoreBreakdown ?? new List<string>();
+            resource.AudioLanguagePreferenceName = audioPreference.AudioLanguagePreferenceName;
+            resource.PreferredAudioInfo = audioPreference.SelectedAudio;
+            resource.AudioPreferenceScore = audioPreference.AudioScore;
+            resource.HasChineseAudioOrSubtitle = audioPreference.HasChineseAudioOrSubtitle;
+        }
+
+        private static void ApplyAudioPreference(ReleaseMediaInfoResource resource, AudioPreferenceResult audioPreference)
+        {
+            resource.SelectedAudioInfo = audioPreference.SelectedAudio;
+            resource.SelectedAudioLanguage = audioPreference.SelectedAudio?.MappedLanguage?.Name ?? audioPreference.SelectedAudio?.Language;
+            resource.SelectedAudioTags = audioPreference.SelectedAudio?.LanguageTags ?? new List<string>();
+            resource.AudioScore = audioPreference.AudioScore;
+            resource.AudioScoreBreakdown = audioPreference.AudioScoreBreakdown ?? new List<string>();
+            resource.AudioLanguagePreferenceName = audioPreference.AudioLanguagePreferenceName;
+            resource.PreferredAudioInfo = audioPreference.SelectedAudio;
+            resource.AudioPreferenceScore = audioPreference.AudioScore;
+            resource.HasChineseAudioOrSubtitle = audioPreference.HasChineseAudioOrSubtitle;
         }
 
         private string GetCacheKey(ReleaseResource resource)

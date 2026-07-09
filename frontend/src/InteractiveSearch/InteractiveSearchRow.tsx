@@ -73,8 +73,12 @@ function getDownloadTooltip(
   return translate('AddToDownloadQueue');
 }
 
-function formatAudioInfo(audioInfo: ReleaseAudioInfo) {
-  const language = audioInfo.language?.trim();
+function formatAudioInfo(audioInfo: ReleaseAudioInfo, displayLanguage?: string) {
+  const language = (
+    displayLanguage ||
+    audioInfo.mappedLanguage?.name ||
+    audioInfo.language
+  )?.trim();
   const specification = audioInfo.specification?.trim();
 
   if (language && specification) {
@@ -142,6 +146,12 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
     languages,
     subs = [],
     audioInfo = [],
+    selectedAudioInfo,
+    selectedAudioLanguage,
+    selectedAudioTags = [],
+    audioScore = 0,
+    audioScoreBreakdown = [],
+    audioLanguagePreferenceName,
     mediaInfoStatus,
     customFormatScore,
     customFormats,
@@ -165,11 +175,20 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
 
   const [isConfirmGrabModalOpen, setIsConfirmGrabModalOpen] = useState(false);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
-  const audioDetails = audioInfo.map(formatAudioInfo).filter(Boolean);
+  const audioDetails = audioInfo.map((audio) => formatAudioInfo(audio)).filter(Boolean);
   const audioLabel =
     audioDetails.length > 1
       ? translate('MultiLanguage')
       : audioInfo[0]?.language?.trim() || audioDetails[0];
+  const selectedAudioLabel = selectedAudioInfo
+    ? formatAudioInfo(selectedAudioInfo, selectedAudioLanguage)
+    : '';
+  const selectedAudioDetails = [
+    selectedAudioLabel,
+    selectedAudioTags.length ? `${translate('Tags')}: ${selectedAudioTags.join(', ')}` : null,
+    audioLanguagePreferenceName ? `${translate('AudioLanguagePreference')}: ${audioLanguagePreferenceName}` : null,
+  ].filter(Boolean);
+  const audioScoreLabel = audioScore > 0 ? `+${audioScore}` : `${audioScore}`;
   const subtitleLabel =
     subs.length > 1 ? translate('MultiLanguage') : subs[0];
   const isMediaInfoPending = mediaInfoStatus === 'pending';
@@ -335,6 +354,52 @@ function InteractiveSearchRow(props: InteractiveSearchRowProps) {
             />
           ) : null}
         </span>
+      </TableRowCell>
+
+      <TableRowCell className={styles.selectedAudio}>
+        <span className={styles.mediaCellContent}>
+          {selectedAudioLabel ? (
+            <Popover
+              anchor={<Label kind={kinds.INVERSE}>{selectedAudioLabel}</Label>}
+              title={translate('SelectedAudio')}
+              body={
+                <ul>
+                  {selectedAudioDetails.map((detail, index) => {
+                    return <li key={index}>{detail}</li>;
+                  })}
+                </ul>
+              }
+              position={tooltipPositions.LEFT}
+            />
+          ) : null}
+
+          {isAudioInfoLoading ? (
+            <SpinnerIcon
+              className={styles.mediaLoadingIcon}
+              name={icons.SPINNER}
+              isSpinning={true}
+            />
+          ) : null}
+        </span>
+      </TableRowCell>
+
+      <TableRowCell className={styles.audioScore}>
+        {audioScoreBreakdown.length ? (
+          <Popover
+            anchor={audioScoreLabel}
+            title={translate('AudioScoreBreakdown')}
+            body={
+              <ul>
+                {audioScoreBreakdown.map((score, index) => {
+                  return <li key={index}>{score}</li>;
+                })}
+              </ul>
+            }
+            position={tooltipPositions.LEFT}
+          />
+        ) : (
+          audioScoreLabel
+        )}
       </TableRowCell>
 
       <TableRowCell className={styles.subs}>

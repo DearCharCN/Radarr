@@ -5,6 +5,9 @@ import CustomFormat from 'typings/CustomFormat';
 
 export interface ReleaseAudioInfo {
   language?: string;
+  mappedLanguage?: Language;
+  languageTags?: string[];
+  matchedLanguageAlias?: string;
   specification?: string;
 }
 
@@ -27,6 +30,12 @@ interface Release {
   languages: Language[];
   subs: string[];
   audioInfo: ReleaseAudioInfo[];
+  selectedAudioInfo?: ReleaseAudioInfo;
+  selectedAudioLanguage?: string;
+  selectedAudioTags?: string[];
+  audioScore?: number;
+  audioScoreBreakdown?: string[];
+  audioLanguagePreferenceName?: string;
   preferredAudioInfo?: ReleaseAudioInfo;
   audioPreferenceScore?: number;
   hasChineseAudioOrSubtitle?: boolean;

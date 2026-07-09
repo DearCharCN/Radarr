@@ -23,7 +23,7 @@ let mediaInfoSearchId = 0;
 
 const mediaInfoWindowSize = 4;
 const mediaInfoRetryDelay = 5000;
-const mediaInfoSortKeys = ['audioInfo', 'subs'];
+const mediaInfoSortKeys = ['audioInfo', 'selectedAudioInfo', 'subs'];
 
 function logMediaInfoDebug(message, data = {}) {
   if (typeof console !== 'undefined' && console.info) {
@@ -67,6 +67,14 @@ export const defaultState = {
 
     audioInfo: function(item, direction) {
       return getMediaInfoSortValue(item, 'audioInfo', direction);
+    },
+
+    selectedAudioInfo: function(item, direction) {
+      return getMediaInfoSortValue(item, 'selectedAudioInfo', direction);
+    },
+
+    audioScore: function(item, direction) {
+      return item.audioScore || 0;
     },
 
     subs: function(item, direction) {
@@ -132,6 +140,18 @@ export const defaultState = {
       const predicate = filterTypePredicates[type];
 
       return predicate(getAudioSummary(item), filterValue);
+    },
+
+    selectedAudioInfo: function(item, filterValue, type) {
+      const predicate = filterTypePredicates[type];
+
+      return predicate(getSelectedAudioSummary(item), filterValue);
+    },
+
+    audioScore: function(item, value, type) {
+      const predicate = filterTypePredicates[type];
+
+      return predicate(item.audioScore || 0, value);
     },
 
     subs: function(item, filterValue, type) {
@@ -252,6 +272,16 @@ export const defaultState = {
       type: filterBuilderTypes.STRING
     },
     {
+      name: 'selectedAudioInfo',
+      label: () => translate('SelectedAudio'),
+      type: filterBuilderTypes.STRING
+    },
+    {
+      name: 'audioScore',
+      label: () => translate('AudioScore'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
       name: 'subs',
       label: () => translate('SubtitleLanguages'),
       type: filterBuilderTypes.STRING
@@ -313,7 +343,7 @@ export const setReleasesFilter = createAction(SET_RELEASES_FILTER);
 // Helpers
 
 function formatAudioInfo(audioInfo) {
-  const language = audioInfo.language?.trim();
+  const language = (audioInfo.mappedLanguage?.name || audioInfo.language)?.trim();
   const specification = audioInfo.specification?.trim();
 
   if (language && specification) {
@@ -335,6 +365,22 @@ function getAudioSummary(item) {
   return audioInfo.map(formatAudioInfo).filter(Boolean).join('; ');
 }
 
+function getSelectedAudioSummary(item) {
+  const {
+    selectedAudioInfo,
+    selectedAudioLanguage
+  } = item;
+
+  if (!selectedAudioInfo) {
+    return '';
+  }
+
+  return formatAudioInfo({
+    ...selectedAudioInfo,
+    language: selectedAudioLanguage || selectedAudioInfo.language
+  });
+}
+
 function getMediaInfoStatusSummary(item) {
   if (item.mediaInfoStatus) {
     return item.mediaInfoStatus;
@@ -350,6 +396,10 @@ function getMediaInfoStatusSummary(item) {
 function getMediaInfoSortSummary(item, sortKey) {
   if (sortKey === 'audioInfo') {
     return getAudioSummary(item);
+  }
+
+  if (sortKey === 'selectedAudioInfo') {
+    return getSelectedAudioSummary(item);
   }
 
   if (sortKey === 'subs') {

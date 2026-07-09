@@ -3,6 +3,7 @@
 interface CssExports {
   'age': string;
   'audioInfo': string;
+  'audioScore': string;
   'blocklist': string;
   'customFormatScore': string;
   'download': string;
@@ -19,6 +20,7 @@ interface CssExports {
   'protocol': string;
   'quality': string;
   'rejected': string;
+  'selectedAudio': string;
   'size': string;
   'subs': string;
   'titleContent': string;

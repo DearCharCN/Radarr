@@ -108,6 +108,10 @@ class EditQualityProfileModalContent extends Component {
       qualities,
       customFormats,
       languages,
+      releaseFilterProfiles,
+      audioLanguagePreferences,
+      audioScoreProfiles,
+      customFormatMutexGroups: customFormatMutexGroupOptions,
       item,
       isInUse,
       onInputChange,
@@ -128,11 +132,19 @@ class EditQualityProfileModalContent extends Component {
       minUpgradeFormatScore,
       cutoffFormatScore,
       language,
+      releaseFilterProfileId,
+      audioLanguagePreferenceId,
+      audioScoreProfileId,
+      customFormatMutexGroupIds,
       items,
       formatItems
     } = item;
 
     const languageId = language ? language.value.id : 0;
+    const releaseFilterProfile = releaseFilterProfileId || { value: 0 };
+    const audioLanguagePreference = audioLanguagePreferenceId || { value: 0 };
+    const audioScoreProfile = audioScoreProfileId || { value: 0 };
+    const customFormatMutexGroupIdsValue = customFormatMutexGroupIds || { value: [] };
 
     return (
       <ModalContent onModalClose={onModalClose}>
@@ -284,6 +296,70 @@ class EditQualityProfileModalContent extends Component {
                           />
                         </FormGroup>
 
+                        <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>
+                            {translate('ReleaseFilterProfile')}
+                          </FormLabel>
+
+                          <FormInputGroup
+                            type={inputTypes.SELECT}
+                            name="releaseFilterProfileId"
+                            {...releaseFilterProfile}
+                            value={releaseFilterProfile.value || 0}
+                            values={releaseFilterProfiles}
+                            helpText={translate('ReleaseFilterProfileHelpText')}
+                            onChange={onInputChange}
+                          />
+                        </FormGroup>
+
+                        <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>
+                            {translate('AudioLanguagePreference')}
+                          </FormLabel>
+
+                          <FormInputGroup
+                            type={inputTypes.SELECT}
+                            name="audioLanguagePreferenceId"
+                            {...audioLanguagePreference}
+                            value={audioLanguagePreference.value || 0}
+                            values={audioLanguagePreferences}
+                            helpText={translate('AudioLanguagePreferenceHelpText')}
+                            onChange={onInputChange}
+                          />
+                        </FormGroup>
+
+                        <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>
+                            {translate('AudioScoreProfile')}
+                          </FormLabel>
+
+                          <FormInputGroup
+                            type={inputTypes.SELECT}
+                            name="audioScoreProfileId"
+                            {...audioScoreProfile}
+                            value={audioScoreProfile.value || 0}
+                            values={audioScoreProfiles}
+                            helpText={translate('AudioScoreProfileHelpText')}
+                            onChange={onInputChange}
+                          />
+                        </FormGroup>
+
+                        <FormGroup size={sizes.EXTRA_SMALL}>
+                          <FormLabel size={sizes.SMALL}>
+                            {translate('CustomFormatMutexGroups')}
+                          </FormLabel>
+
+                          <FormInputGroup
+                            type={inputTypes.SELECT}
+                            name="customFormatMutexGroupIds"
+                            {...customFormatMutexGroupIdsValue}
+                            value={customFormatMutexGroupIdsValue.value || []}
+                            values={customFormatMutexGroupOptions}
+                            helpText={translate('CustomFormatMutexGroupsHelpText')}
+                            onChange={onInputChange}
+                          />
+                        </FormGroup>
+
                         <div className={styles.formatItemLarge}>
                           {getCustomFormatRender(formatItems, otherProps)}
                         </div>
@@ -366,6 +442,10 @@ EditQualityProfileModalContent.propTypes = {
   qualities: PropTypes.arrayOf(PropTypes.object).isRequired,
   customFormats: PropTypes.arrayOf(PropTypes.object).isRequired,
   languages: PropTypes.arrayOf(PropTypes.object).isRequired,
+  releaseFilterProfiles: PropTypes.arrayOf(PropTypes.object).isRequired,
+  audioLanguagePreferences: PropTypes.arrayOf(PropTypes.object).isRequired,
+  audioScoreProfiles: PropTypes.arrayOf(PropTypes.object).isRequired,
+  customFormatMutexGroups: PropTypes.arrayOf(PropTypes.object).isRequired,
   item: PropTypes.object.isRequired,
   isInUse: PropTypes.bool.isRequired,
   onInputChange: PropTypes.func.isRequired,

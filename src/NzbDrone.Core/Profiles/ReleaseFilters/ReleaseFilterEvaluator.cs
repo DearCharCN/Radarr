@@ -9,6 +9,7 @@ using NzbDrone.Common.Serializer;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.AudioLanguageMappings;
+using NzbDrone.Core.Profiles.AudioPreferences;
 
 namespace NzbDrone.Core.Profiles.ReleaseFilters
 {
@@ -22,10 +23,13 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
     {
         private static readonly Regex NonAlphaNumericRegex = new (@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly IAudioLanguageMappingService _audioLanguageMappingService;
+        private readonly IAudioLanguagePreferenceService _audioLanguagePreferenceService;
 
-        public ReleaseFilterEvaluator(IAudioLanguageMappingService audioLanguageMappingService = null)
+        public ReleaseFilterEvaluator(IAudioLanguageMappingService audioLanguageMappingService = null,
+                                      IAudioLanguagePreferenceService audioLanguagePreferenceService = null)
         {
             _audioLanguageMappingService = audioLanguageMappingService;
+            _audioLanguagePreferenceService = audioLanguagePreferenceService;
         }
 
         public ReleaseFilterEvaluationResult Evaluate(RemoteMovie subject, ReleaseFilterProfile profile)
@@ -226,26 +230,26 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                     return ReleaseFilterValue.FromStrings(release?.Subs);
                 case "selectedaudio":
                 case "preferredaudio":
-                    return ReleaseFilterValue.FromString(FormatAudioInfo(GetChineseMediaPreference(subject).SelectedAudio));
+                    return ReleaseFilterValue.FromString(FormatAudioInfo(GetAudioPreference(subject).SelectedAudio));
                 case "selectedaudiolanguage":
                 case "preferredaudiolanguage":
-                    return ReleaseFilterValue.FromString(GetDisplayLanguage(GetChineseMediaPreference(subject).SelectedAudio));
+                    return ReleaseFilterValue.FromString(GetDisplayLanguage(GetAudioPreference(subject).SelectedAudio));
                 case "selectedaudiospecification":
                 case "selectedaudiospec":
                 case "preferredaudiospecification":
                 case "preferredaudiospec":
-                    return ReleaseFilterValue.FromString(GetChineseMediaPreference(subject).SelectedAudio?.Specification);
+                    return ReleaseFilterValue.FromString(GetAudioPreference(subject).SelectedAudio?.Specification);
                 case "selectedaudiotags":
                 case "selectedaudiotag":
                 case "preferredaudiotags":
                 case "preferredaudiotag":
-                    return ReleaseFilterValue.FromStrings(GetChineseMediaPreference(subject).SelectedAudio?.LanguageTags);
+                    return ReleaseFilterValue.FromStrings(GetAudioPreference(subject).SelectedAudio?.LanguageTags);
                 case "audioscore":
                 case "audiopreferencescore":
-                    return ReleaseFilterValue.FromNumber(GetChineseMediaPreference(subject).AudioPreferenceScore);
+                    return ReleaseFilterValue.FromNumber(GetAudioPreference(subject).AudioScore);
                 case "haschineseaudioorsubtitle":
                 case "chineseaccessible":
-                    return ReleaseFilterValue.FromBool(GetChineseMediaPreference(subject).HasChineseAudioOrSubtitle);
+                    return ReleaseFilterValue.FromBool(GetAudioPreference(subject).HasChineseAudioOrSubtitle);
                 case "hasoriginaudio":
                 case "hasoriginalaudio":
                     return ReleaseFilterValue.FromBool(TagAudioTracks(subject).Any(audio => AudioLanguageMapper.HasTag(audio, AudioLanguageMapper.OriginTag)));
@@ -338,9 +342,25 @@ namespace NzbDrone.Core.Profiles.ReleaseFilters
                 .Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
-        private ChineseMediaPreferenceResult GetChineseMediaPreference(RemoteMovie subject)
+        private AudioPreferenceResult GetAudioPreference(RemoteMovie subject)
         {
-            return ChineseMediaPreferenceEvaluator.Evaluate(subject, _audioLanguageMappingService);
+            return _audioLanguagePreferenceService?.Evaluate(subject) ??
+                   ToAudioPreferenceResult(ChineseMediaPreferenceEvaluator.Evaluate(subject, _audioLanguageMappingService));
+        }
+
+        private static AudioPreferenceResult ToAudioPreferenceResult(ChineseMediaPreferenceResult result)
+        {
+            return new AudioPreferenceResult
+            {
+                SelectedAudio = result.SelectedAudio,
+                AudioScore = result.AudioPreferenceScore,
+                AudioScoreBreakdown = result.SelectedAudio == null ? new List<string>() : new List<string> { $"Legacy Chinese preference: {result.AudioPreferenceScore}" },
+                AudioLanguagePreferenceName = "Legacy Chinese Preference",
+                SelectedPreferenceTag = result.SelectedAudio?.MappedLanguage?.Name ?? result.SelectedAudio?.Language,
+                HasChineseAudio = result.HasChineseAudio,
+                HasChineseSubtitle = result.HasChineseSubtitle,
+                IsMediaInfoPending = result.IsMediaInfoPending
+            };
         }
 
         private static string GetDisplayLanguage(ReleaseAudioInfo audioInfo)

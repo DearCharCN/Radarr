@@ -7,8 +7,11 @@ import AppSectionState, {
   PagedAppSectionState,
 } from 'App/State/AppSectionState';
 import Language from 'Language/Language';
+import AudioLanguagePreference from 'typings/AudioLanguagePreference';
+import AudioScoreProfile from 'typings/AudioScoreProfile';
 import AutoTagging, { AutoTaggingSpecification } from 'typings/AutoTagging';
 import CustomFormat from 'typings/CustomFormat';
+import CustomFormatMutexGroup from 'typings/CustomFormatMutexGroup';
 import DelayProfile from 'typings/DelayProfile';
 import DownloadClient from 'typings/DownloadClient';
 import ImportList from 'typings/ImportList';
@@ -18,6 +21,7 @@ import Indexer from 'typings/Indexer';
 import IndexerFlag from 'typings/IndexerFlag';
 import Notification from 'typings/Notification';
 import QualityProfile from 'typings/QualityProfile';
+import ReleaseFilterProfile from 'typings/ReleaseFilterProfile';
 import General from 'typings/Settings/General';
 import IndexerOptions from 'typings/Settings/IndexerOptions';
 import MediaManagement from 'typings/Settings/MediaManagement';
@@ -35,6 +39,11 @@ export interface AutoTaggingAppState
   extends AppSectionState<AutoTagging>,
     AppSectionDeleteState,
     AppSectionSaveState {}
+
+export type AudioLanguagePreferenceAppState =
+  AppSectionState<AudioLanguagePreference>;
+
+export type AudioScoreProfileAppState = AppSectionState<AudioScoreProfile>;
 
 export interface AutoTaggingSpecificationAppState
   extends AppSectionState<AutoTaggingSpecification>,
@@ -107,6 +116,9 @@ export interface CustomFormatAppState
     AppSectionDeleteState,
     AppSectionSaveState {}
 
+export type CustomFormatMutexGroupAppState =
+  AppSectionState<CustomFormatMutexGroup>;
+
 export interface ImportListOptionsSettingsAppState
   extends AppSectionItemState<ImportListOptionsSettings>,
     AppSectionSaveState {}
@@ -121,12 +133,17 @@ export interface ImportListExclusionsSettingsAppState
 
 export type IndexerFlagSettingsAppState = AppSectionState<IndexerFlag>;
 export type LanguageSettingsAppState = AppSectionState<Language>;
+export type ReleaseFilterProfilesAppState =
+  AppSectionState<ReleaseFilterProfile>;
 export type UiSettingsAppState = AppSectionItemState<UiSettings>;
 
 interface SettingsAppState {
   advancedSettings: boolean;
+  audioLanguagePreferences: AudioLanguagePreferenceAppState;
+  audioScoreProfiles: AudioScoreProfileAppState;
   autoTaggings: AutoTaggingAppState;
   autoTaggingSpecifications: AutoTaggingSpecificationAppState;
+  customFormatMutexGroups: CustomFormatMutexGroupAppState;
   customFormats: CustomFormatAppState;
   delayProfiles: DelayProfileAppState;
   downloadClients: DownloadClientAppState;
@@ -144,6 +161,7 @@ interface SettingsAppState {
   namingExamples: NamingExamplesAppState;
   notifications: NotificationAppState;
   qualityProfiles: QualityProfilesAppState;
+  releaseFilterProfiles: ReleaseFilterProfilesAppState;
   releaseProfiles: ReleaseProfilesAppState;
   ui: UiSettingsAppState;
 }

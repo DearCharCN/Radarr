@@ -20,6 +20,7 @@
 .quality,
 .languages,
 .audioInfo,
+.selectedAudio,
 .subs {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 }
@@ -35,6 +36,19 @@
 .audioInfo {
   width: 180px;
   max-width: 180px;
+}
+
+.selectedAudio {
+  width: 160px;
+  max-width: 160px;
+}
+
+.audioScore {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 70px;
+  font-weight: bold;
+  cursor: default;
 }
 
 .subs {

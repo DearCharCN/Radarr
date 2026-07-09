@@ -5,7 +5,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles.AudioLanguageMappings;
+using NzbDrone.Core.Profiles.AudioPreferences;
 using NzbDrone.Core.Profiles.Delay;
 using NzbDrone.Core.Qualities;
 
@@ -16,7 +16,7 @@ namespace NzbDrone.Core.DecisionEngine
         private readonly IConfigService _configService;
         private readonly IDelayProfileService _delayProfileService;
         private readonly IQualityDefinitionService _qualityDefinitionService;
-        private readonly IAudioLanguageMappingService _audioLanguageMappingService;
+        private readonly IAudioLanguagePreferenceService _audioLanguagePreferenceService;
 
         public delegate int CompareDelegate(DownloadDecision x, DownloadDecision y);
         public delegate int CompareDelegate<TSubject, TValue>(DownloadDecision x, DownloadDecision y);
@@ -24,21 +24,21 @@ namespace NzbDrone.Core.DecisionEngine
         public DownloadDecisionComparer(IConfigService configService,
                                         IDelayProfileService delayProfileService,
                                         IQualityDefinitionService qualityDefinitionService,
-                                        IAudioLanguageMappingService audioLanguageMappingService)
+                                        IAudioLanguagePreferenceService audioLanguagePreferenceService)
         {
             _configService = configService;
             _delayProfileService = delayProfileService;
             _qualityDefinitionService = qualityDefinitionService;
-            _audioLanguageMappingService = audioLanguageMappingService;
+            _audioLanguagePreferenceService = audioLanguagePreferenceService;
         }
 
         public int Compare(DownloadDecision x, DownloadDecision y)
         {
             var comparers = new List<CompareDelegate>
             {
-                CompareQuality,
                 CompareCustomFormatScore,
-                CompareChineseAudioPreference,
+                CompareSelectedAudioScore,
+                CompareQuality,
                 CompareProtocol,
                 CompareIndexerPriority,
                 CompareIndexerFlags,
@@ -91,9 +91,9 @@ namespace NzbDrone.Core.DecisionEngine
             return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.CustomFormatScore);
         }
 
-        private int CompareChineseAudioPreference(DownloadDecision x, DownloadDecision y)
+        private int CompareSelectedAudioScore(DownloadDecision x, DownloadDecision y)
         {
-            return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie, _audioLanguageMappingService).AudioPreferenceScore);
+            return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => _audioLanguagePreferenceService.Evaluate(remoteMovie).AudioScore);
         }
 
         private int CompareIndexerFlags(DownloadDecision x, DownloadDecision y)

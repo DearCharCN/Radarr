@@ -14,13 +14,16 @@ namespace NzbDrone.Core.Profiles.Qualities
     public class QualityProfileRepository : BasicRepository<QualityProfile>, IQualityProfileRepository
     {
         private readonly ICustomFormatService _customFormatService;
+        private readonly ICustomFormatMutexGroupService _customFormatMutexGroupService;
 
         public QualityProfileRepository(IMainDatabase database,
                                  IEventAggregator eventAggregator,
-                                 ICustomFormatService customFormatService)
+                                 ICustomFormatService customFormatService,
+                                 ICustomFormatMutexGroupService customFormatMutexGroupService)
             : base(database, eventAggregator)
         {
             _customFormatService = customFormatService;
+            _customFormatMutexGroupService = customFormatMutexGroupService;
         }
 
         protected override List<QualityProfile> Query(SqlBuilder builder)
@@ -48,6 +51,8 @@ namespace NzbDrone.Core.Profiles.Qualities
                 }
 
                 profile.FormatItems = formatItems;
+                profile.CustomFormatMutexGroupIds ??= new List<int>();
+                profile.CustomFormatMutexGroups = _customFormatMutexGroupService.GetMany(profile.CustomFormatMutexGroupIds).Where(group => group.Enabled).ToList();
             }
 
             return profiles;

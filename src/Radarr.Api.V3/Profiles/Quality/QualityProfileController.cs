@@ -4,6 +4,8 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Profiles.AudioPreferences;
+using NzbDrone.Core.Profiles.AudioScoring;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Profiles.ReleaseFilters;
 using Radarr.Http;
@@ -19,7 +21,10 @@ namespace Radarr.Api.V3.Profiles.Quality
 
         public QualityProfileController(IQualityProfileService qualityProfileService,
                                         ICustomFormatService formatService,
-                                        IReleaseFilterProfileService releaseFilterProfileService)
+                                        IReleaseFilterProfileService releaseFilterProfileService,
+                                        IAudioLanguagePreferenceService audioLanguagePreferenceService,
+                                        IAudioScoreProfileService audioScoreProfileService,
+                                        ICustomFormatMutexGroupService customFormatMutexGroupService)
         {
             _qualityProfileService = qualityProfileService;
 
@@ -43,6 +48,21 @@ namespace Radarr.Api.V3.Profiles.Quality
             {
                 return !id.HasValue || id.Value == 0 || releaseFilterProfileService.Exists(id.Value);
             }).WithMessage("Release Filter Profile does not exist");
+
+            SharedValidator.RuleFor(c => c.AudioLanguagePreferenceId).Must(id =>
+            {
+                return !id.HasValue || id.Value == 0 || audioLanguagePreferenceService.Exists(id.Value);
+            }).WithMessage("Audio Language Preference does not exist");
+
+            SharedValidator.RuleFor(c => c.AudioScoreProfileId).Must(id =>
+            {
+                return !id.HasValue || id.Value == 0 || audioScoreProfileService.Exists(id.Value);
+            }).WithMessage("Audio Score Profile does not exist");
+
+            SharedValidator.RuleFor(c => c.CustomFormatMutexGroupIds).Must(ids =>
+            {
+                return ids == null || ids.All(id => id > 0 && customFormatMutexGroupService.Exists(id));
+            }).WithMessage("Custom Format Mutex Group does not exist");
 
             SharedValidator.RuleFor(c => c).Custom((profile, context) =>
             {

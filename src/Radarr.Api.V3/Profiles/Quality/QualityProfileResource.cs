@@ -20,6 +20,9 @@ namespace Radarr.Api.V3.Profiles.Quality
         public List<ProfileFormatItemResource> FormatItems { get; set; }
         public Language Language { get; set; }
         public int? ReleaseFilterProfileId { get; set; }
+        public int? AudioLanguagePreferenceId { get; set; }
+        public int? AudioScoreProfileId { get; set; }
+        public List<int> CustomFormatMutexGroupIds { get; set; }
     }
 
     public class QualityProfileQualityItemResource : RestResource
@@ -63,7 +66,10 @@ namespace Radarr.Api.V3.Profiles.Quality
                 MinUpgradeFormatScore = model.MinUpgradeFormatScore,
                 FormatItems = model.FormatItems.ConvertAll(ToResource),
                 Language = model.Language,
-                ReleaseFilterProfileId = model.ReleaseFilterProfileId
+                ReleaseFilterProfileId = model.ReleaseFilterProfileId,
+                AudioLanguagePreferenceId = model.AudioLanguagePreferenceId,
+                AudioScoreProfileId = model.AudioScoreProfileId,
+                CustomFormatMutexGroupIds = model.CustomFormatMutexGroupIds ?? new List<int>()
             };
         }
 
@@ -113,7 +119,10 @@ namespace Radarr.Api.V3.Profiles.Quality
                 MinUpgradeFormatScore = resource.MinUpgradeFormatScore,
                 FormatItems = resource.FormatItems.ConvertAll(ToModel),
                 Language = resource.Language,
-                ReleaseFilterProfileId = resource.ReleaseFilterProfileId
+                ReleaseFilterProfileId = resource.ReleaseFilterProfileId,
+                AudioLanguagePreferenceId = resource.AudioLanguagePreferenceId,
+                AudioScoreProfileId = resource.AudioScoreProfileId,
+                CustomFormatMutexGroupIds = resource.CustomFormatMutexGroupIds ?? new List<int>()
             };
         }
 

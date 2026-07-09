@@ -37,6 +37,8 @@ using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles;
 using NzbDrone.Core.Profiles.AudioLanguageMappings;
+using NzbDrone.Core.Profiles.AudioPreferences;
+using NzbDrone.Core.Profiles.AudioScoring;
 using NzbDrone.Core.Profiles.Delay;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Profiles.ReleaseFilters;
@@ -144,7 +146,8 @@ namespace NzbDrone.Core.Datastore
 
             Mapper.Entity<CustomFormat>("CustomFormats").RegisterModel();
 
-            Mapper.Entity<QualityProfile>("QualityProfiles").RegisterModel();
+            Mapper.Entity<QualityProfile>("QualityProfiles").RegisterModel()
+                  .Ignore(p => p.CustomFormatMutexGroups);
             Mapper.Entity<Log>("Logs").RegisterModel();
             Mapper.Entity<NamingConfig>("NamingConfig").RegisterModel();
             Mapper.Entity<Blocklist>("Blocklist").RegisterModel();
@@ -159,6 +162,9 @@ namespace NzbDrone.Core.Datastore
             Mapper.Entity<Tag>("Tags").RegisterModel();
             Mapper.Entity<ReleaseProfile>("ReleaseProfiles").RegisterModel();
             Mapper.Entity<AudioLanguageMapping>("AudioLanguageMappings").RegisterModel();
+            Mapper.Entity<AudioScoreProfile>("AudioScoreProfiles").RegisterModel();
+            Mapper.Entity<AudioLanguagePreference>("AudioLanguagePreferences").RegisterModel();
+            Mapper.Entity<CustomFormatMutexGroup>("CustomFormatMutexGroups").RegisterModel();
             Mapper.Entity<ReleaseFilterProfile>("ReleaseFilterProfiles").RegisterModel();
 
             Mapper.Entity<DelayProfile>("DelayProfiles").RegisterModel();

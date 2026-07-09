@@ -36,6 +36,12 @@ namespace Radarr.Api.V3.Indexers
         public List<Language> Languages { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public ReleaseAudioInfo SelectedAudioInfo { get; set; }
+        public string SelectedAudioLanguage { get; set; }
+        public List<string> SelectedAudioTags { get; set; }
+        public int AudioScore { get; set; }
+        public List<string> AudioScoreBreakdown { get; set; }
+        public string AudioLanguagePreferenceName { get; set; }
         public ReleaseAudioInfo PreferredAudioInfo { get; set; }
         public int AudioPreferenceScore { get; set; }
         public bool HasChineseAudioOrSubtitle { get; set; }
@@ -89,6 +95,12 @@ namespace Radarr.Api.V3.Indexers
         public int ProwlarrIndexerId { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public ReleaseAudioInfo SelectedAudioInfo { get; set; }
+        public string SelectedAudioLanguage { get; set; }
+        public List<string> SelectedAudioTags { get; set; }
+        public int AudioScore { get; set; }
+        public List<string> AudioScoreBreakdown { get; set; }
+        public string AudioLanguagePreferenceName { get; set; }
         public ReleaseAudioInfo PreferredAudioInfo { get; set; }
         public int AudioPreferenceScore { get; set; }
         public bool HasChineseAudioOrSubtitle { get; set; }
@@ -134,6 +146,12 @@ namespace Radarr.Api.V3.Indexers
                 Languages = remoteMovie.Languages,
                 Subs = releaseInfo.Subs,
                 AudioInfo = releaseInfo.AudioInfo,
+                SelectedAudioInfo = chineseMediaPreference.SelectedAudio,
+                SelectedAudioLanguage = chineseMediaPreference.SelectedAudio?.MappedLanguage?.Name ?? chineseMediaPreference.SelectedAudio?.Language,
+                SelectedAudioTags = chineseMediaPreference.SelectedAudio?.LanguageTags ?? new List<string>(),
+                AudioScore = chineseMediaPreference.AudioPreferenceScore,
+                AudioScoreBreakdown = chineseMediaPreference.SelectedAudio == null ? new List<string>() : new List<string> { $"Legacy Chinese preference: {chineseMediaPreference.AudioPreferenceScore}" },
+                AudioLanguagePreferenceName = "Legacy Chinese Preference",
                 PreferredAudioInfo = chineseMediaPreference.SelectedAudio,
                 AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore,
                 HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle,

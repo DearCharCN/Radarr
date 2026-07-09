@@ -24,6 +24,10 @@ namespace NzbDrone.Core.Profiles.Qualities
         public Language Language { get; set; }
         public bool UpgradeAllowed { get; set; }
         public int? ReleaseFilterProfileId { get; set; }
+        public int? AudioLanguagePreferenceId { get; set; }
+        public int? AudioScoreProfileId { get; set; }
+        public List<int> CustomFormatMutexGroupIds { get; set; } = new ();
+        public List<CustomFormatMutexGroup> CustomFormatMutexGroups { get; set; } = new ();
 
         public Quality FirststAllowedQuality()
         {
@@ -93,7 +97,36 @@ namespace NzbDrone.Core.Profiles.Qualities
 
         public int CalculateCustomFormatScore(List<CustomFormat> formats)
         {
-            return FormatItems.Where(x => formats.Contains(x.Format)).Sum(x => x.Score);
+            var matchedFormatIds = formats?.Select(format => format.Id).ToHashSet() ?? new HashSet<int>();
+            var activeGroups = CustomFormatMutexGroups?.Where(group => group.Enabled).ToList() ?? new List<CustomFormatMutexGroup>();
+            var formatItems = FormatItems ?? new List<ProfileFormatItem>();
+
+            if (!activeGroups.Any())
+            {
+                return formatItems.Where(x => matchedFormatIds.Contains(x.Format.Id)).Sum(x => x.Score);
+            }
+
+            var groupedFormatIds = activeGroups
+                .SelectMany(group => group.CustomFormatIds ?? new List<int>())
+                .ToHashSet();
+
+            var score = formatItems
+                .Where(item => matchedFormatIds.Contains(item.Format.Id) && !groupedFormatIds.Contains(item.Format.Id))
+                .Sum(item => item.Score);
+
+            foreach (var group in activeGroups)
+            {
+                var groupFormatIds = group.CustomFormatIds?.ToHashSet() ?? new HashSet<int>();
+                var groupScore = formatItems
+                    .Where(item => matchedFormatIds.Contains(item.Format.Id) && groupFormatIds.Contains(item.Format.Id))
+                    .Select(item => item.Score)
+                    .DefaultIfEmpty()
+                    .Max();
+
+                score += groupScore;
+            }
+
+            return score;
         }
     }
 }

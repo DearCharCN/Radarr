@@ -18,6 +18,10 @@ interface QualityProfile {
   cutoffFormatScore: number;
   minUpgradeFormatScore: number;
   formatItems: QualityProfileFormatItem[];
+  releaseFilterProfileId?: number;
+  audioLanguagePreferenceId?: number;
+  audioScoreProfileId?: number;
+  customFormatMutexGroupIds: number[];
   id: number;
 }
 
