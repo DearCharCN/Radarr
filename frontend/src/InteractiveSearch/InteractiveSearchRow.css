@@ -106,14 +106,14 @@
 }
 
 .audioTrackTagSelected {
-  border-color: var(--dangerColor);
-  background-color: var(--dangerColor);
-  color: var(--white);
+  border-color: var(--successColor);
+  background-color: var(--successColor);
+  color: #eee;
 }
 
 .audioTrackTagOrigin {
-  border-color: var(--themeLightColor);
-  background-color: var(--themeLightColor);
+  border-color: var(--dangerColor);
+  background-color: var(--dangerColor);
   color: var(--white);
 }
 
@@ -124,9 +124,9 @@
 }
 
 .audioTrackTagChinese {
-  border-color: var(--successColor);
-  background-color: var(--successColor);
-  color: #eee;
+  border-color: var(--themeLightColor);
+  background-color: var(--themeLightColor);
+  color: var(--white);
 }
 
 .audioPreference {
