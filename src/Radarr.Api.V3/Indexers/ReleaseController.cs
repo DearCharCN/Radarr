@@ -222,6 +222,10 @@ namespace Radarr.Api.V3.Indexers
             remoteMovie.Release.MediaInfoProgressCompleted = result.MediaInfoProgressCompleted;
             remoteMovie.Release.MediaInfoProgressTotal = result.MediaInfoProgressTotal;
             remoteMovie.Release.ProwlarrIndexerId = prowlarrIndexerId;
+            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie);
+            result.PreferredAudioInfo = chineseMediaPreference.SelectedAudio;
+            result.AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore;
+            result.HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle;
             _logger.Debug("Radarr mediaInfo proxy request completed: release {0}, indexer {1}, prowlarr indexer {2}, status {3}, handle {4}, progress {5}/{6} {7}",
                 release.Guid,
                 release.IndexerId,

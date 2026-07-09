@@ -36,6 +36,9 @@ namespace Radarr.Api.V3.Indexers
         public List<Language> Languages { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public ReleaseAudioInfo PreferredAudioInfo { get; set; }
+        public int AudioPreferenceScore { get; set; }
+        public bool HasChineseAudioOrSubtitle { get; set; }
         public string MediaInfoStatus { get; set; }
         public string MediaInfoHandleId { get; set; }
         public string MediaInfoSearchId { get; set; }
@@ -86,6 +89,9 @@ namespace Radarr.Api.V3.Indexers
         public int ProwlarrIndexerId { get; set; }
         public List<string> Subs { get; set; }
         public List<ReleaseAudioInfo> AudioInfo { get; set; }
+        public ReleaseAudioInfo PreferredAudioInfo { get; set; }
+        public int AudioPreferenceScore { get; set; }
+        public bool HasChineseAudioOrSubtitle { get; set; }
         public string MediaInfoStatus { get; set; }
         public string MediaInfoHandleId { get; set; }
         public string MediaInfoSearchId { get; set; }
@@ -103,6 +109,7 @@ namespace Radarr.Api.V3.Indexers
             var remoteMovie = model.RemoteMovie;
             var torrentInfo = (model.RemoteMovie.Release as TorrentInfo) ?? new TorrentInfo();
             var indexerFlags = torrentInfo.IndexerFlags.ToString().Split(new[] { ", " }, StringSplitOptions.None).Where(x => x != "0");
+            var chineseMediaPreference = ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie);
 
             // TODO: Clean this mess up. don't mix data from multiple classes, use sub-resources instead? (Got a huge Deja Vu, didn't we talk about this already once?)
             return new ReleaseResource
@@ -127,6 +134,9 @@ namespace Radarr.Api.V3.Indexers
                 Languages = remoteMovie.Languages,
                 Subs = releaseInfo.Subs,
                 AudioInfo = releaseInfo.AudioInfo,
+                PreferredAudioInfo = chineseMediaPreference.SelectedAudio,
+                AudioPreferenceScore = chineseMediaPreference.AudioPreferenceScore,
+                HasChineseAudioOrSubtitle = chineseMediaPreference.HasChineseAudioOrSubtitle,
                 MediaInfoStatus = releaseInfo.MediaInfoStatus,
                 MediaInfoHandleId = releaseInfo.MediaInfoHandleId,
                 MediaInfoSearchId = releaseInfo.MediaInfoSearchId,

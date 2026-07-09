@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Profiles.Qualities;
+using NzbDrone.Core.Profiles.ReleaseFilters;
 using Radarr.Http;
 using Radarr.Http.REST;
 using Radarr.Http.REST.Attributes;
@@ -16,7 +17,9 @@ namespace Radarr.Api.V3.Profiles.Quality
     {
         private readonly IQualityProfileService _qualityProfileService;
 
-        public QualityProfileController(IQualityProfileService qualityProfileService, ICustomFormatService formatService)
+        public QualityProfileController(IQualityProfileService qualityProfileService,
+                                        ICustomFormatService formatService,
+                                        IReleaseFilterProfileService releaseFilterProfileService)
         {
             _qualityProfileService = qualityProfileService;
 
@@ -35,6 +38,11 @@ namespace Radarr.Api.V3.Profiles.Quality
 
                 return all.Except(ids).Empty();
             }).WithMessage("All Custom Formats and no extra ones need to be present inside your Profile! Try refreshing your browser.");
+
+            SharedValidator.RuleFor(c => c.ReleaseFilterProfileId).Must(id =>
+            {
+                return !id.HasValue || id.Value == 0 || releaseFilterProfileService.Exists(id.Value);
+            }).WithMessage("Release Filter Profile does not exist");
 
             SharedValidator.RuleFor(c => c).Custom((profile, context) =>
             {

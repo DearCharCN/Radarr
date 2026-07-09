@@ -27,6 +27,9 @@ interface Release {
   languages: Language[];
   subs: string[];
   audioInfo: ReleaseAudioInfo[];
+  preferredAudioInfo?: ReleaseAudioInfo;
+  audioPreferenceScore?: number;
+  hasChineseAudioOrSubtitle?: boolean;
   mediaInfoStatus?: string;
   mediaInfoHandleId?: string;
   mediaInfoSearchId?: string;

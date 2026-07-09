@@ -32,6 +32,7 @@ namespace NzbDrone.Core.DecisionEngine
             {
                 CompareQuality,
                 CompareCustomFormatScore,
+                CompareChineseAudioPreference,
                 CompareProtocol,
                 CompareIndexerPriority,
                 CompareIndexerFlags,
@@ -82,6 +83,11 @@ namespace NzbDrone.Core.DecisionEngine
         private int CompareCustomFormatScore(DownloadDecision x, DownloadDecision y)
         {
             return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.CustomFormatScore);
+        }
+
+        private int CompareChineseAudioPreference(DownloadDecision x, DownloadDecision y)
+        {
+            return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => ChineseMediaPreferenceEvaluator.Evaluate(remoteMovie).AudioPreferenceScore);
         }
 
         private int CompareIndexerFlags(DownloadDecision x, DownloadDecision y)

@@ -467,6 +467,31 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         }
 
         [Test]
+        public void should_prefer_higher_chinese_audio_preference_score()
+        {
+            var remoteMovie1 = GivenRemoteMovie(new QualityModel(Quality.Bluray720p));
+            remoteMovie1.Movie.MovieMetadata.Value.OriginalLanguage = Language.English;
+            remoteMovie1.Release.AudioInfo = new List<ReleaseAudioInfo>
+            {
+                new () { Language = "Chinese", Specification = "DDP 5.1" }
+            };
+
+            var remoteMovie2 = GivenRemoteMovie(new QualityModel(Quality.Bluray720p));
+            remoteMovie2.Movie.MovieMetadata.Value.OriginalLanguage = Language.English;
+            remoteMovie2.Release.AudioInfo = new List<ReleaseAudioInfo>
+            {
+                new () { Language = "Chinese", Specification = "TrueHD Atmos 7.1" }
+            };
+
+            var decisions = new List<DownloadDecision>();
+            decisions.Add(new DownloadDecision(remoteMovie1));
+            decisions.Add(new DownloadDecision(remoteMovie2));
+
+            var qualifiedReports = Subject.PrioritizeDecisionsForMovies(decisions);
+            qualifiedReports.First().RemoteMovie.Release.Should().Be(remoteMovie2.Release);
+        }
+
+        [Test]
         public void should_prefer_proper_over_score_when_download_propers_is_prefer_and_upgrade()
         {
             Mocker.GetMock<IConfigService>()

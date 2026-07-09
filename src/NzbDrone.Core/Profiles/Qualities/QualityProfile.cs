@@ -23,6 +23,7 @@ namespace NzbDrone.Core.Profiles.Qualities
         public List<ProfileFormatItem> FormatItems { get; set; }
         public Language Language { get; set; }
         public bool UpgradeAllowed { get; set; }
+        public int? ReleaseFilterProfileId { get; set; }
 
         public Quality FirststAllowedQuality()
         {
