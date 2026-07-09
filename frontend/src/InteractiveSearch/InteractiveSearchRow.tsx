@@ -135,27 +135,77 @@ function isSelectedAudioTrack(
   );
 }
 
+type AudioTrackTagKind = 'selected' | 'origin' | 'chinese' | 'language';
+
+interface AudioTrackTag {
+  label: string;
+  kind: AudioTrackTagKind;
+}
+
+function getAudioTrackTagKind(tag: string): AudioTrackTagKind {
+  const normalized = tag.trim().toLocaleLowerCase();
+
+  if (normalized === 'origin') {
+    return 'origin';
+  }
+
+  if (normalized === 'chinese' || normalized === 'mandarin') {
+    return 'chinese';
+  }
+
+  return 'language';
+}
+
 function getAudioTrackTags(
   audioInfo: ReleaseAudioInfo,
   isSelected: boolean,
   selectedAudioTags: string[]
 ) {
-  const tags = isSelected
+  const sourceTags = isSelected
     ? [
-        translate('Selected'),
         ...(selectedAudioTags.length
           ? selectedAudioTags
           : audioInfo.languageTags || []),
       ]
     : audioInfo.languageTags || [];
+  const tags: AudioTrackTag[] = [
+    ...(isSelected
+      ? [{ label: translate('Selected'), kind: 'selected' as const }]
+      : []),
+    ...sourceTags
+      .map((tag) => tag?.trim())
+      .filter((tag): tag is string => Boolean(tag))
+      .map((tag) => {
+        return {
+          label: tag,
+          kind: getAudioTrackTagKind(tag),
+        };
+      }),
+  ];
+  const seen = new Set<string>();
 
-  return Array.from(
-    new Set(
-      tags
-        .map((tag) => tag?.trim())
-        .filter((tag): tag is string => Boolean(tag))
-    )
-  );
+  return tags.filter(({ label }) => {
+    const key = label.toLocaleLowerCase();
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+
+    return true;
+  });
+}
+
+function getAudioTrackTagClass(kind: AudioTrackTagKind) {
+  const kindClass = {
+    chinese: styles.audioTrackTagChinese,
+    language: styles.audioTrackTagLanguage,
+    origin: styles.audioTrackTagOrigin,
+    selected: styles.audioTrackTagSelected,
+  }[kind];
+
+  return `${styles.audioTrackTag} ${kindClass}`;
 }
 
 interface AudioTrackDetailProps {
@@ -178,8 +228,8 @@ function AudioTrackDetail({
     <span className={styles.audioTrack}>
       {tags.map((tag) => {
         return (
-          <span key={tag} className={styles.audioTrackTag}>
-            {tag}
+          <span key={tag.label} className={getAudioTrackTagClass(tag.kind)}>
+            {tag.label}
           </span>
         );
       })}

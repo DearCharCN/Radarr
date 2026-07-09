@@ -10,6 +10,10 @@ interface CssExports {
   'audioTrack': string;
   'audioTrackList': string;
   'audioTrackTag': string;
+  'audioTrackTagChinese': string;
+  'audioTrackTagLanguage': string;
+  'audioTrackTagOrigin': string;
+  'audioTrackTagSelected': string;
   'blocklist': string;
   'customFormatScore': string;
   'download': string;
