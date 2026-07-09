@@ -101,6 +101,17 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         }
 
         [Test]
+        public void release_filter_specs_should_accept_when_no_profile_is_bound()
+        {
+            _remoteMovie.Movie.QualityProfile.ReleaseFilterProfileId = null;
+            _remoteMovie.Release.MediaInfoStatus = "pending";
+
+            Mocker.Resolve<ReleaseFilterMediaInfoPendingSpecification>().IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeTrue();
+            Mocker.Resolve<ReleaseFilterSpecification>().IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeTrue();
+            Mocker.GetMock<IReleaseFilterEvaluator>().Verify(x => x.Evaluate(_remoteMovie, _profile), Times.Never());
+        }
+
+        [Test]
         public void release_filter_spec_should_reject_when_required_media_info_is_unavailable()
         {
             _remoteMovie.Release.MediaInfoStatus = "failed";
