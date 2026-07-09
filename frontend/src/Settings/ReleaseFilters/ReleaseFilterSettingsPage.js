@@ -160,14 +160,14 @@ function createDefaultProfile() {
     id: 0,
     name: translate('DefaultReleaseFilterProfileName'),
     enabled: true,
-    filter: cloneFilterNode(DEFAULT_FILTER)
+    filter: createGroupNode([createConditionNode()])
   };
 }
 
 function cloneProfile(profile) {
   return {
     ...profile,
-    filter: cloneFilterNode(profile.filter)
+    filter: ensureGroupHasCondition(cloneFilterNode(profile.filter))
   };
 }
 
@@ -185,6 +185,21 @@ function createGroupNode(children = []) {
     type: 'group',
     mode: 'and',
     children
+  };
+}
+
+function ensureGroupHasCondition(node) {
+  if (!node || node.type !== 'group') {
+    return node;
+  }
+
+  const children = node.children || [];
+
+  return {
+    ...node,
+    children: children.length ?
+      children.map(ensureGroupHasCondition) :
+      [createConditionNode()]
   };
 }
 
@@ -286,10 +301,16 @@ function removeNodeAtPath(node, path) {
   const parentPath = path.slice(0, -1);
   const removeIndex = path[path.length - 1];
 
-  return updateNodeAtPath(node, parentPath, (parent) => ({
-    ...parent,
-    children: (parent.children || []).filter((_, index) => index !== removeIndex)
-  }));
+  return updateNodeAtPath(node, parentPath, (parent) => {
+    if ((parent.children || []).length === 1) {
+      return parent;
+    }
+
+    return {
+      ...parent,
+      children: (parent.children || []).filter((_, index) => index !== removeIndex)
+    };
+  });
 }
 
 function AddCard({ onPress }) {
@@ -446,6 +467,7 @@ function FilterValueInput({ node, onChange }) {
 function FilterConditionEditor({
   node,
   path,
+  filterCount,
   onNodeChange,
   onNodeRemove,
   onAddFilterAfterPress
@@ -513,6 +535,7 @@ function FilterConditionEditor({
         <IconButton
           title={translate('Delete')}
           name={icons.SUBTRACT}
+          isDisabled={filterCount === 1}
           onPress={() => onNodeRemove(path)}
         />
 
@@ -530,9 +553,9 @@ function FilterGroupEditor({
   node,
   path,
   isRoot,
+  filterCount,
   onNodeChange,
   onNodeRemove,
-  onAddFilterToGroupPress,
   onAddGroupToGroupPress,
   onAddFilterAfterPress
 }) {
@@ -558,12 +581,6 @@ function FilterGroupEditor({
 
         <div className={styles.groupActionsContainer}>
           <IconButton
-            title={translate('AddFilterCondition')}
-            name={icons.ADD}
-            onPress={() => onAddFilterToGroupPress(path)}
-          />
-
-          <IconButton
             title={translate('AddFilterGroup')}
             name={icons.GROUP}
             onPress={() => onAddGroupToGroupPress(path)}
@@ -573,6 +590,7 @@ function FilterGroupEditor({
             <IconButton
               title={translate('Delete')}
               name={icons.SUBTRACT}
+              isDisabled={filterCount === 1}
               onPress={() => onNodeRemove(path)}
             />
           )}
@@ -585,9 +603,9 @@ function FilterGroupEditor({
             key={`${child.type || 'condition'}-${path.concat(index).join('.')}`}
             node={child}
             path={[...path, index]}
+            filterCount={children.length}
             onNodeChange={onNodeChange}
             onNodeRemove={onNodeRemove}
-            onAddFilterToGroupPress={onAddFilterToGroupPress}
             onAddGroupToGroupPress={onAddGroupToGroupPress}
             onAddFilterAfterPress={onAddFilterAfterPress}
           />
@@ -604,9 +622,9 @@ function FilterGroupEditor({
 function FilterNodeEditor({
   node,
   path,
+  filterCount,
   onNodeChange,
   onNodeRemove,
-  onAddFilterToGroupPress,
   onAddGroupToGroupPress,
   onAddFilterAfterPress
 }) {
@@ -616,9 +634,9 @@ function FilterNodeEditor({
         node={node}
         path={path}
         isRoot={path.length === 0}
+        filterCount={filterCount}
         onNodeChange={onNodeChange}
         onNodeRemove={onNodeRemove}
-        onAddFilterToGroupPress={onAddFilterToGroupPress}
         onAddGroupToGroupPress={onAddGroupToGroupPress}
         onAddFilterAfterPress={onAddFilterAfterPress}
       />
@@ -629,6 +647,7 @@ function FilterNodeEditor({
     <FilterConditionEditor
       node={node}
       path={path}
+      filterCount={filterCount}
       onNodeChange={onNodeChange}
       onNodeRemove={onNodeRemove}
       onAddFilterAfterPress={onAddFilterAfterPress}
@@ -657,17 +676,6 @@ function EditProfileModal({
     setDraft((current) => ({
       ...current,
       filter: removeNodeAtPath(current.filter || cloneFilterNode(DEFAULT_FILTER), path)
-    }));
-  }, [setDraft]);
-
-  const addFilterToGroup = useCallback((path) => {
-    setDraft((current) => ({
-      ...current,
-      filter: addChildToGroup(
-        current.filter || cloneFilterNode(DEFAULT_FILTER),
-        path,
-        createConditionNode()
-      )
     }));
   }, [setDraft]);
 
@@ -737,9 +745,9 @@ function EditProfileModal({
             <FilterNodeEditor
               node={draft.filter || cloneFilterNode(DEFAULT_FILTER)}
               path={[]}
+              filterCount={1}
               onNodeChange={updateFilterNode}
               onNodeRemove={removeFilterNode}
-              onAddFilterToGroupPress={addFilterToGroup}
               onAddGroupToGroupPress={addGroupToGroup}
               onAddFilterAfterPress={addFilterAfter}
             />

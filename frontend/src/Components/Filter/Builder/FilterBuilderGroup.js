@@ -28,7 +28,6 @@ function FilterBuilderGroup(props) {
     filterBuilderProps,
     onGroupChange,
     onFilterChange,
-    onAddFilterToGroupPress,
     onAddGroupToGroupPress,
     onAddFilterAfterPress,
     onRemovePress
@@ -39,10 +38,6 @@ function FilterBuilderGroup(props) {
       ...group,
       combinator: value
     });
-  };
-
-  const onAddFilter = () => {
-    onAddFilterToGroupPress(path);
   };
 
   const onAddGroup = () => {
@@ -66,12 +61,6 @@ function FilterBuilderGroup(props) {
         </div>
 
         <div className={styles.groupActionsContainer}>
-          <IconButton
-            title="Add condition"
-            name={icons.ADD}
-            onPress={onAddFilter}
-          />
-
           <IconButton
             title="Add group"
             name={icons.GROUP}
@@ -107,7 +96,6 @@ function FilterBuilderGroup(props) {
                   filterBuilderProps={filterBuilderProps}
                   onGroupChange={onGroupChange}
                   onFilterChange={onFilterChange}
-                  onAddFilterToGroupPress={onAddFilterToGroupPress}
                   onAddGroupToGroupPress={onAddGroupToGroupPress}
                   onAddFilterAfterPress={onAddFilterAfterPress}
                   onRemovePress={onRemovePress}
@@ -146,7 +134,6 @@ FilterBuilderGroup.propTypes = {
   filterBuilderProps: PropTypes.arrayOf(PropTypes.object).isRequired,
   onGroupChange: PropTypes.func.isRequired,
   onFilterChange: PropTypes.func.isRequired,
-  onAddFilterToGroupPress: PropTypes.func.isRequired,
   onAddGroupToGroupPress: PropTypes.func.isRequired,
   onAddFilterAfterPress: PropTypes.func.isRequired,
   onRemovePress: PropTypes.func.isRequired

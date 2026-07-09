@@ -148,12 +148,6 @@ class FilterBuilderModalContent extends Component {
     });
   };
 
-  onAddFilterToGroupPress = (path) => {
-    this.setState({
-      filterGroup: addChildToGroup(this.state.filterGroup, path, {})
-    });
-  };
-
   onAddGroupToGroupPress = (path) => {
     this.setState({
       filterGroup: addChildToGroup(this.state.filterGroup, path, createFilterGroup('and', [{}]))
@@ -262,7 +256,6 @@ class FilterBuilderModalContent extends Component {
               filterBuilderProps={filterBuilderProps}
               onGroupChange={this.onGroupChange}
               onFilterChange={this.onFilterChange}
-              onAddFilterToGroupPress={this.onAddFilterToGroupPress}
               onAddGroupToGroupPress={this.onAddGroupToGroupPress}
               onAddFilterAfterPress={this.onAddFilterAfterPress}
               onRemovePress={this.onRemovePress}
