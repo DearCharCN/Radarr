@@ -44,6 +44,14 @@ function Settings() {
           {translate('CustomFormatsSettingsSummary')}
         </div>
 
+        <Link className={styles.link} to="/settings/releasescoring">
+          {translate('ReleaseScoring')}
+        </Link>
+
+        <div className={styles.summary}>
+          {translate('ReleaseScoringSettingsSummary')}
+        </div>
+
         <Link className={styles.link} to="/settings/indexers">
           {translate('Indexers')}
         </Link>

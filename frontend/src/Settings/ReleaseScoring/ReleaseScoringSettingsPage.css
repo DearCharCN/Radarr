@@ -1,0 +1,178 @@
+.sectionToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.buttonContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableScroller {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 8px;
+  text-align: left;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 8px;
+  border-top: 1px solid var(--borderColor);
+  vertical-align: middle;
+}
+
+.nameCell {
+  font-weight: bold;
+}
+
+.actionsCell {
+  width: 76px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyState {
+  padding: 16px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  color: var(--helpTextColor);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: bold;
+}
+
+.input {
+  composes: input from '~Components/Form/Input.css';
+}
+
+.textArea {
+  composes: input from '~Components/Form/Input.css';
+
+  min-height: 105px;
+  height: auto;
+  resize: vertical;
+}
+
+.checkboxField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-weight: bold;
+}
+
+.arrayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+
+.arrayHeader h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.formTableScroller {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.formTable {
+  min-width: 760px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.formTable th {
+  padding: 6px;
+  text-align: left;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.formTable td {
+  padding: 6px;
+  border-top: 1px solid var(--borderColor);
+}
+
+.compactInput {
+  composes: input from '~Components/Form/Input.css';
+
+  min-width: 120px;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.scoreInput {
+  composes: input from '~Components/Form/Input.css';
+
+  width: 88px;
+  min-width: 88px;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.checkboxCell {
+  width: 78px;
+  text-align: center;
+}
+
+.rowButtonCell {
+  width: 36px;
+  text-align: center;
+}
+
+.checkboxList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  background-color: var(--inputBackgroundColor);
+}
+
+.checkboxListItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.checkboxListItem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

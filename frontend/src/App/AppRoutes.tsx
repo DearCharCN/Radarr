@@ -22,6 +22,7 @@ import MetadataSettings from 'Settings/Metadata/MetadataSettings';
 import NotificationSettings from 'Settings/Notifications/NotificationSettings';
 import Profiles from 'Settings/Profiles/Profiles';
 import QualityConnector from 'Settings/Quality/QualityConnector';
+import ReleaseScoringSettingsPage from 'Settings/ReleaseScoring/ReleaseScoringSettingsPage';
 import Settings from 'Settings/Settings';
 import TagSettings from 'Settings/Tags/TagSettings';
 import UISettingsConnector from 'Settings/UI/UISettingsConnector';
@@ -108,6 +109,11 @@ function AppRoutes() {
       <Route
         path="/settings/customformats"
         component={CustomFormatSettingsPage}
+      />
+
+      <Route
+        path="/settings/releasescoring"
+        component={ReleaseScoringSettingsPage}
       />
 
       <Route path="/settings/indexers" component={IndexerSettings} />
