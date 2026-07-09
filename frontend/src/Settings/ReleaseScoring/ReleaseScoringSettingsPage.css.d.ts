@@ -9,12 +9,15 @@ interface CssExports {
   'cardCheckbox': string;
   'cardGrid': string;
   'cardInput': string;
+  'cardTitle': string;
+  'cardTitleContainer': string;
   'center': string;
   'checkboxCell': string;
   'checkboxField': string;
   'checkboxList': string;
   'checkboxListItem': string;
   'compactInput': string;
+  'configCard': string;
   'editableCard': string;
   'editableCardHeader': string;
   'emptyState': string;
@@ -25,7 +28,11 @@ interface CssExports {
   'input': string;
   'inputList': string;
   'inputListItem': string;
+  'label': string;
+  'labels': string;
+  'leftButtons': string;
   'nameCell': string;
+  'pickerPanel': string;
   'rowButtonCell': string;
   'scoreInput': string;
   'sectionToolbar': string;

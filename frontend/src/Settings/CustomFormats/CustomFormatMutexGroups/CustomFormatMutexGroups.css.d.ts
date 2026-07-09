@@ -2,12 +2,14 @@
 // Please do not change this file!
 interface CssExports {
   'addMutexGroup': string;
+  'arrayHeader': string;
   'buttons': string;
   'center': string;
   'checkboxField': string;
   'checkboxList': string;
   'checkboxListItem': string;
   'customFormatMutexGroups': string;
+  'emptyState': string;
   'field': string;
   'formGrid': string;
   'iconButton': string;
@@ -17,6 +19,8 @@ interface CssExports {
   'mutexGroupCard': string;
   'name': string;
   'nameContainer': string;
+  'pickerPanel': string;
+  'selectionCard': string;
 }
 export const cssExports: CssExports;
 export default cssExports;

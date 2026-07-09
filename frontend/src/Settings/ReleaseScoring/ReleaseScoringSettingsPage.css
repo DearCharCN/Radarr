@@ -48,6 +48,10 @@
   gap: 12px;
 }
 
+.leftButtons {
+  margin-right: auto;
+}
+
 .emptyState {
   padding: 16px;
   border: 1px solid var(--borderColor);
@@ -196,6 +200,41 @@
   margin: 0 -10px 12px;
 }
 
+.configCard {
+  composes: card from '~Components/Card.css';
+
+  width: 300px;
+  min-height: 88px;
+}
+
+.cardTitleContainer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTitle {
+  @add-mixin truncate;
+
+  margin-bottom: 20px;
+  font-weight: 300;
+  font-size: 24px;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  pointer-events: all;
+}
+
+.label {
+  @add-mixin truncate;
+  composes: label from '~Components/Label.css';
+
+  max-width: 100%;
+}
+
 .editableCard {
   composes: card from '~Components/Card.css';
 
@@ -248,4 +287,12 @@
   border: 1px solid var(--borderColor);
   border-radius: 4px;
   background-color: var(--cardCenterBackgroundColor);
+}
+
+.pickerPanel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  background-color: var(--cardAlternateBackgroundColor);
 }

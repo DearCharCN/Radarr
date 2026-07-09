@@ -4,6 +4,7 @@ import Alert from 'Components/Alert';
 import Card from 'Components/Card';
 import FieldSet from 'Components/FieldSet';
 import Icon from 'Components/Icon';
+import Label from 'Components/Label';
 import Button from 'Components/Link/Button';
 import IconButton from 'Components/Link/IconButton';
 import SpinnerButton from 'Components/Link/SpinnerButton';
@@ -16,7 +17,7 @@ import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
-import { icons } from 'Helpers/Props';
+import { icons, kinds } from 'Helpers/Props';
 import SettingsToolbar from 'Settings/SettingsToolbar';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
@@ -223,24 +224,9 @@ function cloneLanguagePreference(item) {
   };
 }
 
-function AddButton({ label, onPress }) {
-  return (
-    <Button kind="primary" onPress={onPress}>
-      <span className={styles.buttonContent}>
-        <Icon name={icons.ADD} size={12} />
-        {label}
-      </span>
-    </Button>
-  );
-}
-
-function ConfigSection({ legend, addLabel, onAddPress, children }) {
+function ConfigSection({ legend, children }) {
   return (
     <FieldSet legend={legend}>
-      <div className={styles.sectionToolbar}>
-        <AddButton label={addLabel} onPress={onAddPress} />
-      </div>
-
       {children}
     </FieldSet>
   );
@@ -269,6 +255,60 @@ function ActionButtons({ onEditPress, onDeletePress }) {
         onPress={onDeletePress}
       />
     </div>
+  );
+}
+
+function AddCard({ onPress }) {
+  return (
+    <Card
+      className={styles.addCard}
+      onPress={onPress}
+    >
+      <div className={styles.center}>
+        <Icon
+          name={icons.ADD}
+          size={45}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ConfigCard({ title, labels, enabled, onEditPress, onDeletePress }) {
+  return (
+    <Card
+      className={styles.configCard}
+      overlayContent={true}
+      onPress={onEditPress}
+    >
+      <div className={styles.cardTitleContainer}>
+        <div className={styles.cardTitle}>
+          {title}
+        </div>
+
+        <ActionButtons
+          onEditPress={onEditPress}
+          onDeletePress={onDeletePress}
+        />
+      </div>
+
+      <div className={styles.labels}>
+        {(labels || []).filter(Boolean).map((label, index) => (
+          <Label
+            key={`${label}-${index}`}
+            className={styles.label}
+          >
+            {label}
+          </Label>
+        ))}
+
+        {enabled ? null : (
+          <Label className={styles.label} kind={kinds.WARNING}>
+            {translate('Disabled')}
+          </Label>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -330,6 +370,10 @@ function CheckboxField({ label, checked, onChange }) {
       <span>{label}</span>
     </label>
   );
+}
+
+function getAudioScoreRuleName(rule, index) {
+  return rule.name || rule.pattern || `${translate('AudioScoreRules')} ${index + 1}`;
 }
 
 function LanguageMappingForm({ draft, languages, setDraft }) {
@@ -422,9 +466,202 @@ function LanguageMappingForm({ draft, languages, setDraft }) {
   );
 }
 
+function AudioScoreMutexGroupModal({
+  editor,
+  rules,
+  setEditor,
+  onSavePress,
+  onDeletePress,
+  onModalClose
+}) {
+  if (!editor) {
+    return null;
+  }
+
+  const selectedRuleIndexes = editor.selectedRuleIndexes || [];
+  const selectedRuleIndexSet = new Set(selectedRuleIndexes);
+  const availableRuleIndexes = rules
+    .map((_, index) => index)
+    .filter((index) => !selectedRuleIndexSet.has(index));
+
+  function updateGroup(field, value) {
+    setEditor((current) => ({
+      ...current,
+      group: {
+        ...current.group,
+        [field]: value
+      }
+    }));
+  }
+
+  function addRule(ruleIndex) {
+    setEditor((current) => ({
+      ...current,
+      isRulePickerOpen: false,
+      selectedRuleIndexes: [
+        ...(current.selectedRuleIndexes || []),
+        ruleIndex
+      ]
+    }));
+  }
+
+  function removeRule(ruleIndex) {
+    setEditor((current) => ({
+      ...current,
+      selectedRuleIndexes: (current.selectedRuleIndexes || [])
+        .filter((index) => index !== ruleIndex)
+    }));
+  }
+
+  return (
+    <Modal
+      isOpen={true}
+      size="large"
+      onModalClose={onModalClose}
+    >
+      <ModalContent onModalClose={onModalClose}>
+        <ModalHeader>
+          {
+            editor.index == null ?
+              translate('AddAudioScoreMutexGroup') :
+              translate('EditAudioScoreMutexGroup')
+          }
+        </ModalHeader>
+
+        <ModalBody>
+          <div className={styles.formGrid}>
+            <TextField
+              label={translate('Name')}
+              value={editor.group.name}
+              onChange={(value) => updateGroup('name', value)}
+            />
+          </div>
+
+          <CheckboxField
+            label={translate('Enabled')}
+            checked={editor.group.enabled}
+            onChange={(value) => updateGroup('enabled', value)}
+          />
+
+          <div className={styles.arrayHeader}>
+            <h3>{translate('AudioScoreRules')}</h3>
+          </div>
+
+          <div className={styles.cardGrid}>
+            {selectedRuleIndexes.map((ruleIndex) => {
+              const rule = rules[ruleIndex];
+
+              if (!rule) {
+                return null;
+              }
+
+              return (
+                <Card
+                  key={ruleIndex}
+                  className={styles.configCard}
+                >
+                  <div className={styles.cardTitleContainer}>
+                    <div className={styles.cardTitle}>
+                      {getAudioScoreRuleName(rule, ruleIndex)}
+                    </div>
+
+                    <IconButton
+                      aria-label={translate('Remove')}
+                      title={translate('Remove')}
+                      name={icons.DELETE}
+                      size={12}
+                      onPress={() => removeRule(ruleIndex)}
+                    />
+                  </div>
+
+                  <div className={styles.labels}>
+                    <Label className={styles.label}>{rule.pattern}</Label>
+                    <Label className={styles.label}>{rule.score ?? 0}</Label>
+                  </div>
+                </Card>
+              );
+            })}
+
+            <AddCard
+              onPress={() => {
+                setEditor((current) => ({
+                  ...current,
+                  isRulePickerOpen: true
+                }));
+              }}
+            />
+          </div>
+
+          {editor.isRulePickerOpen ? (
+            <div className={styles.pickerPanel}>
+              <div className={styles.arrayHeader}>
+                <h3>{translate('AvailableAudioScoreRules')}</h3>
+              </div>
+
+              {availableRuleIndexes.length ? (
+                <div className={styles.cardGrid}>
+                  {availableRuleIndexes.map((ruleIndex) => {
+                    const rule = rules[ruleIndex];
+
+                    return (
+                      <Card
+                        key={ruleIndex}
+                        className={styles.configCard}
+                        overlayContent={true}
+                        onPress={() => addRule(ruleIndex)}
+                      >
+                        <div className={styles.cardTitle}>
+                          {getAudioScoreRuleName(rule, ruleIndex)}
+                        </div>
+
+                        <div className={styles.labels}>
+                          <Label className={styles.label}>{rule.pattern}</Label>
+                          <Label className={styles.label}>{rule.score ?? 0}</Label>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState>{translate('NoAudioScoreRulesAvailable')}</EmptyState>
+              )}
+            </div>
+          ) : null}
+        </ModalBody>
+
+        <ModalFooter>
+          <div className={styles.leftButtons}>
+            {
+              editor.index == null ? null : (
+                <Button
+                  kind="danger"
+                  onPress={onDeletePress}
+                >
+                  {translate('Delete')}
+                </Button>
+              )
+            }
+          </div>
+
+          <Button onPress={onModalClose}>{translate('Cancel')}</Button>
+
+          <SpinnerButton
+            kind="primary"
+            isSpinning={false}
+            onPress={onSavePress}
+          >
+            {translate('Save')}
+          </SpinnerButton>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+}
+
 function AudioScoreProfileForm({ draft, setDraft }) {
   const mutexGroups = draft.mutexGroups || [];
   const rules = draft.rules || [];
+  const [mutexGroupEditor, setMutexGroupEditor] = useState(null);
   const mutexGroupNames = Array.from(new Set(
     mutexGroups
       .map((group) => `${group.name || ''}`.trim())
@@ -446,19 +683,110 @@ function AudioScoreProfileForm({ draft, setDraft }) {
     });
   }
 
-  function updateMutexGroup(index, field, value) {
+  function openMutexGroupEditor(index) {
+    const group = mutexGroups[index];
+    const groupName = `${group?.name || ''}`.trim();
+    const selectedRuleIndexes = rules
+      .map((rule, ruleIndex) => (
+        rule.mutexGroup === groupName ? ruleIndex : null
+      ))
+      .filter((ruleIndex) => ruleIndex != null);
+
+    setMutexGroupEditor({
+      index,
+      originalName: groupName,
+      group: {
+        ...group
+      },
+      selectedRuleIndexes,
+      isRulePickerOpen: false
+    });
+  }
+
+  function openAddMutexGroupEditor() {
+    setMutexGroupEditor({
+      index: null,
+      originalName: '',
+      group: {
+        name: '',
+        enabled: true
+      },
+      selectedRuleIndexes: [],
+      isRulePickerOpen: false
+    });
+  }
+
+  function saveMutexGroupEditor() {
+    if (!mutexGroupEditor) {
+      return;
+    }
+
+    const nextName = `${mutexGroupEditor.group.name || ''}`.trim();
+    const selectedRuleIndexes = new Set(mutexGroupEditor.selectedRuleIndexes || []);
+
     setDraft((current) => {
       const nextGroups = [...(current.mutexGroups || [])];
-      nextGroups[index] = {
-        ...nextGroups[index],
-        [field]: value
+      const nextGroup = {
+        ...mutexGroupEditor.group,
+        name: nextName
       };
+
+      if (mutexGroupEditor.index == null) {
+        nextGroups.push(nextGroup);
+      } else {
+        nextGroups[mutexGroupEditor.index] = nextGroup;
+      }
+
+      const nextRules = (current.rules || []).map((rule, ruleIndex) => {
+        if (selectedRuleIndexes.has(ruleIndex)) {
+          return {
+            ...rule,
+            mutexGroup: nextName
+          };
+        }
+
+        if (mutexGroupEditor.originalName && rule.mutexGroup === mutexGroupEditor.originalName) {
+          return {
+            ...rule,
+            mutexGroup: ''
+          };
+        }
+
+        return rule;
+      });
 
       return {
         ...current,
-        mutexGroups: nextGroups
+        mutexGroups: nextGroups,
+        rules: nextRules
       };
     });
+
+    setMutexGroupEditor(null);
+  }
+
+  function deleteMutexGroupEditor() {
+    if (!mutexGroupEditor || mutexGroupEditor.index == null) {
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      mutexGroups: (current.mutexGroups || [])
+        .filter((_, groupIndex) => groupIndex !== mutexGroupEditor.index),
+      rules: (current.rules || []).map((rule) => {
+        if (mutexGroupEditor.originalName && rule.mutexGroup === mutexGroupEditor.originalName) {
+          return {
+            ...rule,
+            mutexGroup: ''
+          };
+        }
+
+        return rule;
+      })
+    }));
+
+    setMutexGroupEditor(null);
   }
 
   return (
@@ -624,64 +952,32 @@ function AudioScoreProfileForm({ draft, setDraft }) {
 
       <div className={styles.cardGrid}>
         {mutexGroups.map((group, index) => (
-          <Card key={index} className={styles.editableCard}>
-            <div className={styles.editableCardHeader}>
-              <input
-                className={styles.cardInput}
-                type="text"
-                value={group.name || ''}
-                placeholder={translate('Name')}
-                onChange={(event) => updateMutexGroup(index, 'name', event.target.value)}
-              />
-
-              <IconButton
-                aria-label={translate('Delete')}
-                title={translate('Delete')}
-                name={icons.DELETE}
-                size={12}
-                onPress={() => {
-                  setDraft((current) => ({
-                    ...current,
-                    mutexGroups: (current.mutexGroups || []).filter((_, groupIndex) => groupIndex !== index)
-                  }));
-                }}
-              />
+          <Card
+            key={index}
+            className={styles.configCard}
+            overlayContent={true}
+            onPress={() => openMutexGroupEditor(index)}
+          >
+            <div className={styles.cardTitle}>
+              {group.name || translate('Untitled')}
             </div>
-
-            <label className={styles.cardCheckbox}>
-              <input
-                type="checkbox"
-                checked={!!group.enabled}
-                onChange={(event) => updateMutexGroup(index, 'enabled', event.target.checked)}
-              />
-              <span>{translate('Enabled')}</span>
-            </label>
           </Card>
         ))}
 
-        <Card
-          className={styles.addCard}
-          onPress={() => {
-            setDraft((current) => ({
-              ...current,
-              mutexGroups: [
-                ...(current.mutexGroups || []),
-                {
-                  name: '',
-                  enabled: true
-                }
-              ]
-            }));
-          }}
-        >
-          <div className={styles.center}>
-            <Icon
-              name={icons.ADD}
-              size={45}
-            />
-          </div>
-        </Card>
+        {/* eslint-disable-next-line react/jsx-no-bind */}
+        <AddCard onPress={openAddMutexGroupEditor} />
       </div>
+
+      {/* eslint-disable react/jsx-no-bind */}
+      <AudioScoreMutexGroupModal
+        editor={mutexGroupEditor}
+        rules={rules}
+        setEditor={setMutexGroupEditor}
+        onSavePress={saveMutexGroupEditor}
+        onDeletePress={deleteMutexGroupEditor}
+        onModalClose={() => setMutexGroupEditor(null)}
+      />
+      {/* eslint-enable react/jsx-no-bind */}
     </>
   );
 }
@@ -1071,122 +1367,66 @@ function ReleaseScoringSettingsPage() {
           <>
             <ConfigSection
               legend={translate('AudioLanguageMappings')}
-              addLabel={translate('AddAudioLanguageMapping')}
-              onAddPress={() => openModal('languageMapping')}
             >
-              {languageMappings.length ? (
-                <div className={styles.tableScroller}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>{translate('Language')}</th>
-                        <th>{translate('AudioLanguageAliases')}</th>
-                        <th>{translate('Status')}</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {languageMappings.map((mapping) => (
-                        <tr key={mapping.id}>
-                          <td className={styles.nameCell}>{getLanguageName(mapping.language)}</td>
-                          <td>{(mapping.aliases || []).join(', ')}</td>
-                          <td>{mapping.enabled ? translate('Enabled') : translate('Disabled')}</td>
-                          <td className={styles.actionsCell}>
-                            <ActionButtons
-                              onEditPress={() => openModal('languageMapping', mapping)}
-                              onDeletePress={() => setDeleteTarget({ type: 'languageMapping', item: mapping })}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState>{translate('NoAudioLanguageMappings')}</EmptyState>
-              )}
+              <div className={styles.cardGrid}>
+                {languageMappings.map((mapping) => (
+                  <ConfigCard
+                    key={mapping.id}
+                    title={getLanguageName(mapping.language)}
+                    labels={mapping.aliases || []}
+                    enabled={mapping.enabled}
+                    onEditPress={() => openModal('languageMapping', mapping)}
+                    onDeletePress={() => setDeleteTarget({ type: 'languageMapping', item: mapping })}
+                  />
+                ))}
+
+                <AddCard onPress={() => openModal('languageMapping')} />
+              </div>
             </ConfigSection>
 
             <ConfigSection
               legend={translate('AudioScoreProfiles')}
-              addLabel={translate('AddAudioScoreProfile')}
-              onAddPress={() => openModal('audioScoreProfile')}
             >
-              {audioScoreProfiles.length ? (
-                <div className={styles.tableScroller}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>{translate('Name')}</th>
-                        <th>{translate('AudioScoreRules')}</th>
-                        <th>{translate('AudioScoreMutexGroups')}</th>
-                        <th>{translate('Status')}</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {audioScoreProfiles.map((profile) => (
-                        <tr key={profile.id}>
-                          <td className={styles.nameCell}>{profile.name}</td>
-                          <td>{(profile.rules || []).length}</td>
-                          <td>{(profile.mutexGroups || []).map((group) => group.name).join(', ')}</td>
-                          <td>{profile.enabled ? translate('Enabled') : translate('Disabled')}</td>
-                          <td className={styles.actionsCell}>
-                            <ActionButtons
-                              onEditPress={() => openModal('audioScoreProfile', profile)}
-                              onDeletePress={() => setDeleteTarget({ type: 'audioScoreProfile', item: profile })}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState>{translate('NoAudioScoreProfiles')}</EmptyState>
-              )}
+              <div className={styles.cardGrid}>
+                {audioScoreProfiles.map((profile) => (
+                  <ConfigCard
+                    key={profile.id}
+                    title={profile.name}
+                    labels={[
+                      `${(profile.rules || []).length} ${translate('AudioScoreRules')}`,
+                      ...(profile.mutexGroups || []).map((group) => group.name)
+                    ]}
+                    enabled={profile.enabled}
+                    onEditPress={() => openModal('audioScoreProfile', profile)}
+                    onDeletePress={() => setDeleteTarget({ type: 'audioScoreProfile', item: profile })}
+                  />
+                ))}
+
+                <AddCard onPress={() => openModal('audioScoreProfile')} />
+              </div>
             </ConfigSection>
 
             <ConfigSection
               legend={translate('AudioLanguagePreferences')}
-              addLabel={translate('AddAudioLanguagePreference')}
-              onAddPress={() => openModal('languagePreference')}
             >
-              {languagePreferences.length ? (
-                <div className={styles.tableScroller}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>{translate('Name')}</th>
-                        <th>{translate('AudioLanguagePreferenceEntries')}</th>
-                        <th>{translate('ScoreGapThreshold')}</th>
-                        <th>{translate('AudioScoreProfile')}</th>
-                        <th>{translate('Status')}</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {languagePreferences.map((preference) => (
-                        <tr key={preference.id}>
-                          <td className={styles.nameCell}>{preference.name}</td>
-                          <td>{(preference.entries || []).map((entry) => entry.languageTag).join(', ')}</td>
-                          <td>{preference.scoreGapThreshold}</td>
-                          <td>{audioScoreProfileNames[preference.audioScoreProfileId] || translate('None')}</td>
-                          <td>{preference.enabled ? translate('Enabled') : translate('Disabled')}</td>
-                          <td className={styles.actionsCell}>
-                            <ActionButtons
-                              onEditPress={() => openModal('languagePreference', preference)}
-                              onDeletePress={() => setDeleteTarget({ type: 'languagePreference', item: preference })}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState>{translate('NoAudioLanguagePreferences')}</EmptyState>
-              )}
+              <div className={styles.cardGrid}>
+                {languagePreferences.map((preference) => (
+                  <ConfigCard
+                    key={preference.id}
+                    title={preference.name}
+                    labels={[
+                      ...(preference.entries || []).map((entry) => entry.languageTag),
+                      `${translate('ScoreGapThreshold')}: ${preference.scoreGapThreshold}`,
+                      audioScoreProfileNames[preference.audioScoreProfileId] || translate('None')
+                    ]}
+                    enabled={preference.enabled}
+                    onEditPress={() => openModal('languagePreference', preference)}
+                    onDeletePress={() => setDeleteTarget({ type: 'languagePreference', item: preference })}
+                  />
+                ))}
+
+                <AddCard onPress={() => openModal('languagePreference')} />
+              </div>
             </ConfigSection>
 
           </>

@@ -68,6 +68,41 @@
   background-color: var(--cardCenterBackgroundColor);
 }
 
+.selectionCard {
+  composes: card from '~Components/Card.css';
+
+  width: 300px;
+  min-height: 82px;
+}
+
+.arrayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+
+.arrayHeader h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.emptyState {
+  padding: 16px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  color: var(--helpTextColor);
+}
+
+.pickerPanel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+  background-color: var(--cardAlternateBackgroundColor);
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

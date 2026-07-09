@@ -78,8 +78,40 @@ function cloneCustomFormatMutexGroup(item) {
   };
 }
 
+function EmptyState({ children }) {
+  return <div className={styles.emptyState}>{children}</div>;
+}
+
 function CustomFormatMutexGroupForm({ draft, customFormats, setDraft }) {
   const selectedIds = draft.customFormatIds || [];
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const customFormatsById = useMemo(() => {
+    return customFormats.reduce((acc, customFormat) => {
+      acc[customFormat.id] = customFormat;
+      return acc;
+    }, {});
+  }, [customFormats]);
+  const availableCustomFormats = customFormats
+    .filter((format) => !selectedIds.includes(format.id));
+
+  function addCustomFormat(id) {
+    setDraft((current) => ({
+      ...current,
+      customFormatIds: [
+        ...(current.customFormatIds || []),
+        id
+      ]
+    }));
+    setIsPickerOpen(false);
+  }
+
+  function removeCustomFormat(id) {
+    setDraft((current) => ({
+      ...current,
+      customFormatIds: (current.customFormatIds || [])
+        .filter((customFormatId) => customFormatId !== id)
+    }));
+  }
 
   return (
     <>
@@ -114,30 +146,78 @@ function CustomFormatMutexGroupForm({ draft, customFormats, setDraft }) {
         <span>{translate('Enabled')}</span>
       </label>
 
-      <div className={styles.checkboxList}>
-        {customFormats.map((format) => (
-          <label key={format.id} className={styles.checkboxListItem}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(format.id)}
-              onChange={(event) => {
-                setDraft((current) => {
-                  const currentIds = current.customFormatIds || [];
-                  const nextIds = event.target.checked ?
-                    [...currentIds, format.id] :
-                    currentIds.filter((id) => id !== format.id);
-
-                  return {
-                    ...current,
-                    customFormatIds: nextIds
-                  };
-                });
-              }}
-            />
-            <span>{format.name}</span>
-          </label>
-        ))}
+      <div className={styles.arrayHeader}>
+        <h3>{translate('CustomFormats')}</h3>
       </div>
+
+      <div className={styles.customFormatMutexGroups}>
+        {selectedIds.map((id) => {
+          const format = customFormatsById[id];
+
+          if (!format) {
+            return null;
+          }
+
+          return (
+            <Card
+              key={id}
+              className={styles.selectionCard}
+            >
+              <div className={styles.nameContainer}>
+                <div className={styles.name}>
+                  {format.name}
+                </div>
+
+                <IconButton
+                  className={styles.iconButton}
+                  title={translate('Remove')}
+                  name={icons.DELETE}
+                  onPress={() => removeCustomFormat(id)}
+                />
+              </div>
+            </Card>
+          );
+        })}
+
+        <Card
+          className={styles.addMutexGroup}
+          onPress={() => setIsPickerOpen(true)}
+        >
+          <div className={styles.center}>
+            <Icon
+              name={icons.ADD}
+              size={45}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {isPickerOpen ? (
+        <div className={styles.pickerPanel}>
+          <div className={styles.arrayHeader}>
+            <h3>{translate('AvailableCustomFormats')}</h3>
+          </div>
+
+          {availableCustomFormats.length ? (
+            <div className={styles.customFormatMutexGroups}>
+              {availableCustomFormats.map((format) => (
+                <Card
+                  key={format.id}
+                  className={styles.selectionCard}
+                  overlayContent={true}
+                  onPress={() => addCustomFormat(format.id)}
+                >
+                  <div className={styles.name}>
+                    {format.name}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState>{translate('NoCustomFormatsAvailable')}</EmptyState>
+          )}
+        </div>
+      ) : null}
     </>
   );
 }
