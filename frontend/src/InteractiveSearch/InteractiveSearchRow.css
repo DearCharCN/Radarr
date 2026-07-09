@@ -90,35 +90,43 @@
 }
 
 .audioTrackTag {
+  composes: label from '~Components/Label.css';
+
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
-  min-height: 18px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  font-weight: bold;
-  line-height: 14px;
+  margin: 0;
+  padding: 1px 3px;
+  min-height: 0;
+  border-color: var(--themeLightColor);
+  border-radius: 2px;
+  background-color: var(--themeLightColor);
+  color: var(--white);
+  font-size: 11px;
+  line-height: 1;
 }
 
 .audioTrackTagSelected {
-  background: var(--themeRed);
-  color: #fff;
+  border-color: var(--dangerColor);
+  background-color: var(--dangerColor);
+  color: var(--white);
 }
 
 .audioTrackTagOrigin {
-  background: #202020;
-  color: #fff;
+  border-color: var(--themeLightColor);
+  background-color: var(--themeLightColor);
+  color: var(--white);
 }
 
 .audioTrackTagLanguage {
-  background: var(--gray);
-  color: #fff;
+  border-color: var(--themeLightColor);
+  background-color: var(--themeLightColor);
+  color: var(--white);
 }
 
 .audioTrackTagChinese {
-  border-color: #202020;
-  background: #fff;
-  color: #202020;
+  border-color: var(--successColor);
+  background-color: var(--successColor);
+  color: #eee;
 }
 
 .audioPreference {
